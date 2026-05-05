@@ -5,30 +5,27 @@ export default function SyncPage() {
   const [log, setLog] = useState([]);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
-  const startSync = async () => {
+  const runPhase = async (phase) => {
     setRunning(true);
     setDone(false);
-    setLog(['Starting sync…']);
+    setHasMore(false);
+    if (phase === 'auto') setLog(['Starting sync…']);
+    else setLog((prev) => [...prev, `--- Continuing (${phase}) ---`]);
 
     try {
-      const res = await apiFetch('/api/sync', { method: 'POST' });
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { value, done: streamDone } = await reader.read();
-        if (streamDone) break;
-        const text = decoder.decode(value);
-        const lines = text.split('\n').filter(Boolean);
-        setLog((prev) => [...prev, ...lines]);
-      }
+      const res = await apiFetch(`/api/sync?phase=${phase}`, { method: 'POST' });
+      const text = await res.text();
+      const lines = text.split('\n').filter(Boolean);
+      setLog((prev) => [...prev, ...lines]);
+      setHasMore(lines.some((l) => l.includes('remaining')));
+      setDone(!lines.some((l) => l.includes('remaining')));
     } catch (err) {
       setLog((prev) => [...prev, `Error: ${err.message}`]);
     }
 
     setRunning(false);
-    setDone(true);
   };
 
   return (
@@ -36,26 +33,31 @@ export default function SyncPage() {
       <h1>🔄 Data Sync</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
         Syncing downloads all Pokémon TCG sets and cards into the shared database.
-        This only needs to run once to populate data, then monthly to pick up new sets.
-        The sync runs automatically once a month via a scheduled job.
+        Cards are synced in batches — click <strong>Continue</strong> after each batch until complete.
+        The sync runs automatically once a month to pick up new sets.
       </p>
 
-      <button
-        className="btn btn-primary"
-        onClick={startSync}
-        disabled={running}
-        style={{ marginBottom: 20 }}
-      >
-        {running ? '⏳ Syncing…' : '🔄 Start Sync Now'}
-      </button>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={() => runPhase('auto')} disabled={running}>
+          {running ? '⏳ Syncing…' : '🔄 Start Sync'}
+        </button>
+        {hasMore && !running && (
+          <button className="btn btn-primary" onClick={() => runPhase('cards')} disabled={running}>
+            ▶ Continue Next Batch
+          </button>
+        )}
+      </div>
 
       {log.length > 0 && (
-        <div style={{
-          background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 20,
-        }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 20 }}>
           {done && (
             <div style={{ marginBottom: 12, fontWeight: 600, color: '#4caf50' }}>
               ✅ Sync complete
+            </div>
+          )}
+          {hasMore && !running && (
+            <div style={{ marginBottom: 12, fontWeight: 600, color: 'var(--yellow)' }}>
+              ⏳ More cards to sync — click <strong>Continue Next Batch</strong>
             </div>
           )}
           <div style={{
@@ -70,4 +72,5 @@ export default function SyncPage() {
     </div>
   );
 }
+
 
