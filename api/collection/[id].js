@@ -1,11 +1,11 @@
-import { createSupabaseClient, requireUser } from '../../lib/supabase.js';
+import { createServiceClient, requireUser } from '../../lib/supabase.js';
 
 export default async function handler(req, res) {
   const { id } = req.query;
   const user = await requireUser(req, res);
   if (!user) return;
 
-  const supabase = createSupabaseClient();
+  const supabase = createServiceClient();
 
   if (req.method === 'PUT') {
     const { quantity, condition, wishlist, notes } = req.body;

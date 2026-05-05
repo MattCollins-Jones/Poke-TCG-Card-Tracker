@@ -1,7 +1,7 @@
-import { createSupabaseClient, requireUser } from '../../lib/supabase.js';
+import { createServiceClient, requireUser } from '../../lib/supabase.js';
 
 export default async function handler(req, res) {
-  const supabase = createSupabaseClient();
+  const supabase = createServiceClient();
 
   if (req.method === 'GET') {
     const user = await requireUser(req, res);

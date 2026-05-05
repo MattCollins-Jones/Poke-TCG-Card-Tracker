@@ -1,4 +1,4 @@
-import { createSupabaseClient, requireUser } from '../../lib/supabase.js';
+import { createServiceClient, requireUser } from '../../lib/supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const user = await requireUser(req, res);
   if (!user) return;
 
-  const supabase = createSupabaseClient();
+  const supabase = createServiceClient();
 
   // Count distinct owned cards per set (not wishlist)
   const { data, error } = await supabase

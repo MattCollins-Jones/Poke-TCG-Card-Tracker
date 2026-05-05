@@ -1,4 +1,4 @@
-import { createSupabaseClient } from '../../lib/supabase.js';
+import { createServiceClient } from '../../lib/supabase.js';
 
 function shapeCard(c) {
   return {
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   const { setId } = req.query;
-  const supabase = createSupabaseClient();
+  const supabase = createServiceClient();
 
   const { data: rows, error } = await supabase
     .from('cards')
