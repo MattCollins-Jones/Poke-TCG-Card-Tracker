@@ -62,7 +62,8 @@ export default async function handler(req, res) {
         const rows = sets.slice(i, i + BATCH).map((s) => ({
           id: s.id,
           name: s.name,
-          total: s.cardCount?.official ?? null,
+          total: s.cardCount?.total ?? null,
+          printed_total: s.cardCount?.official ?? null,
           symbol_image: s.symbol ? `${s.symbol}.webp` : null,
           logo_image: s.logo ? `${s.logo}.webp` : null,
         }));
@@ -84,6 +85,8 @@ export default async function handler(req, res) {
           await supabase.from('sets').update({
             series: detail.serie?.name ?? null,
             release_date: detail.releaseDate ?? null,
+            total: detail.cardCount?.total ?? detail.cards?.length ?? null,
+            printed_total: detail.cardCount?.official ?? null,
             symbol_image: detail.symbol ? `${detail.symbol}.webp` : null,
             logo_image: detail.logo ? `${detail.logo}.webp` : null,
           }).eq('id', detail.id);

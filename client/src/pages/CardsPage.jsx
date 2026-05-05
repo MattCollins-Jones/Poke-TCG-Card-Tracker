@@ -69,28 +69,32 @@ export default function CardsPage() {
     return apiFetch(`/api/collection?set_id=${setId}`)
       .then((r) => r.json())
       .then((rows) => {
+        if (!Array.isArray(rows)) return;
         const map = {};
         rows.forEach((e) => {
           if (!map[e.card_id]) map[e.card_id] = [];
           map[e.card_id].push(e);
         });
         setCollection(map);
-      });
+      })
+      .catch(() => {});
   }, [setId]);
 
   useEffect(() => {
+    // Load cards + sets info — collection is loaded separately so it can't block cards
     Promise.all([
       apiFetch(`/api/cards/${setId}`).then((r) => r.json()),
       apiFetch(`/api/cards/rarities/${setId}`).then((r) => r.json()),
-      loadCollection(),
       apiFetch('/api/sets').then((r) => r.json()),
-    ]).then(([cardsData, raritiesData, , setsData]) => {
+    ]).then(([cardsData, raritiesData, setsData]) => {
       setCards(cardsData.data ?? []);
-      setRarities(raritiesData);
+      setRarities(Array.isArray(raritiesData) ? raritiesData : []);
       const found = (setsData.data ?? []).find((s) => s.id === setId);
       setSetInfo(found);
       setLoading(false);
     }).catch(() => setLoading(false));
+
+    loadCollection();
   }, [setId, loadCollection]);
 
   // In unstacked mode: expand to per-finish variants first, then filter at finish level.
