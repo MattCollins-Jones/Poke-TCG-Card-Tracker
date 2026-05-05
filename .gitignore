@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables
+.env
+**/.env
+.env.local
+.env.*.local
+
+# Database (local dev only — Supabase used in production)
+server/collection.db
+server/*.db
+
+# Locally cached images (large binary files, served from client/public in prod)
+server/public/logos/
+server/public/symbols/
+
+# Build outputs
+client/dist/
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db

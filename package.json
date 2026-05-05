@@ -1,0 +1,9 @@
+{
+  "name": "pokemon-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "dev": "start \"server\" cmd /k \"cd server && npm run dev\" && start \"client\" cmd /k \"cd client && npm run dev\""
+  }
+}

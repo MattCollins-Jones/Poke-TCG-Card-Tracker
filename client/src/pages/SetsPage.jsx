@@ -1,0 +1,89 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+export default function SetsPage() {
+  const [sets, setSets] = useState([]);
+  const [collectionSummary, setCollectionSummary] = useState({});
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/sets').then((r) => r.json()),
+      fetch('/api/collection/summary').then((r) => r.json()),
+    ]).then(([setsData, summary]) => {
+      setSets(setsData.data ?? []);
+      const map = {};
+      summary.forEach((s) => { map[s.set_id] = s.owned_cards; });
+      setCollectionSummary(map);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const filtered = sets.filter((s) =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.series?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Group by series for display
+  const grouped = filtered.reduce((acc, set) => {
+    const key = set.series || 'Other';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(set);
+    return acc;
+  }, {});
+
+  if (loading) return <div className="loading">Loading sets…</div>;
+
+  return (
+    <div>
+      <h1>Browse Sets</h1>
+      <div className="filter-bar">
+        <input
+          className="search-input"
+          type="text"
+          placeholder="Search sets or series…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{filtered.length} sets</span>
+      </div>
+
+      {Object.entries(grouped).map(([series, seriesSets]) => (
+        <div key={series} style={{ marginBottom: 32 }}>
+          <h2>{series}</h2>
+          <div className="sets-grid">
+            {seriesSets.map((set) => (
+            <div key={set.id} className="set-card" onClick={() => navigate(`/sets/${set.id}`)}>
+                {set.images?.logo && <img src={set.images.logo} alt={set.name} />}
+                <div className="set-name">{set.name}</div>
+                <div className="set-meta">
+                  {collectionSummary[set.id]
+                    ? <span className="set-owned">{collectionSummary[set.id]}/{set.total}</span>
+                    : <span>{set.total} cards</span>
+                  } · {set.releaseDate?.slice(0, 4)}
+                </div>
+                {collectionSummary[set.id] > 0 && (
+                  <div className="progress-bar set-progress">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${Math.round((collectionSummary[set.id] / set.total) * 100)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {filtered.length === 0 && (
+        <div className="empty-state">
+          <span className="emoji">🔍</span>
+          No sets match your search.
+        </div>
+      )}
+    </div>
+  );
+}
