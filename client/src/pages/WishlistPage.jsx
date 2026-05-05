@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import CardModal from '../components/CardModal.jsx';
+import { apiFetch } from '../lib/apiFetch.js';
 
 export default function WishlistPage() {
   const [wishlist, setWishlist] = useState([]);
@@ -8,7 +9,7 @@ export default function WishlistPage() {
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   const loadWishlist = useCallback(() => {
-    fetch('/api/collection?wishlist=true')
+    apiFetch('/api/collection?wishlist=true')
       .then((r) => r.json())
       .then((rows) => { setWishlist(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -28,7 +29,7 @@ export default function WishlistPage() {
   }, {});
 
   const handleSave = async (payload) => {
-    await fetch('/api/collection', {
+    await apiFetch('/api/collection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -37,7 +38,7 @@ export default function WishlistPage() {
   };
 
   const handleDelete = async (id) => {
-    await fetch(`/api/collection/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
     loadWishlist();
   };
 

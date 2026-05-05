@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../lib/apiFetch.js';
 
 export default function SetsPage() {
   const [sets, setSets] = useState([]);
@@ -10,8 +11,8 @@ export default function SetsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/sets').then((r) => r.json()),
-      fetch('/api/collection/summary').then((r) => r.json()),
+      apiFetch('/api/sets').then((r) => r.json()),
+      apiFetch('/api/collection/summary').then((r) => r.json()),
     ]).then(([setsData, summary]) => {
       setSets(setsData.data ?? []);
       const map = {};

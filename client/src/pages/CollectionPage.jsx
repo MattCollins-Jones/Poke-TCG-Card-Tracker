@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import CardModal from '../components/CardModal.jsx';
+import { apiFetch } from '../lib/apiFetch.js';
 
 const CONDITIONS = ['mint', 'good', 'played', 'poor'];
 
@@ -11,7 +12,7 @@ export default function CollectionPage() {
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   const loadCollection = useCallback(() => {
-    fetch('/api/collection?wishlist=false')
+    apiFetch('/api/collection?wishlist=false')
       .then((r) => r.json())
       .then((rows) => { setCollection(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -34,7 +35,7 @@ export default function CollectionPage() {
   }, {});
 
   const handleSave = async (payload) => {
-    await fetch('/api/collection', {
+    await apiFetch('/api/collection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -43,7 +44,7 @@ export default function CollectionPage() {
   };
 
   const handleDelete = async (id) => {
-    await fetch(`/api/collection/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
     loadCollection();
   };
 

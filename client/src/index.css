@@ -60,6 +60,11 @@ body {
 }
 .navbar a:hover, .navbar a.active { background: var(--surface2); color: var(--yellow); }
 
+.navbar-user { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.navbar-email { font-size: 0.82rem; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navbar-signout { background: transparent; border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; }
+.navbar-signout:hover { background: var(--surface2); color: var(--yellow); }
+
 /* ── Page headers ── */
 h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 20px; }
 h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CardModal from '../components/CardModal.jsx';
 import { getAvailableFinishes, FINISH_LABELS } from '../utils/finishes.js';
+import { apiFetch } from '../lib/apiFetch.js';
 
 const OWNERSHIP_FILTERS = ['all', 'owned', 'not owned', 'wishlist'];
 
@@ -65,7 +66,7 @@ export default function CardsPage() {
   }, [gridCols]);
 
   const loadCollection = useCallback(() => {
-    return fetch(`/api/collection?set_id=${setId}`)
+    return apiFetch(`/api/collection?set_id=${setId}`)
       .then((r) => r.json())
       .then((rows) => {
         const map = {};
@@ -79,10 +80,10 @@ export default function CardsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/cards/set/${setId}`).then((r) => r.json()),
-      fetch(`/api/cards/rarities/${setId}`).then((r) => r.json()),
+      apiFetch(`/api/cards/${setId}`).then((r) => r.json()),
+      apiFetch(`/api/cards/rarities/${setId}`).then((r) => r.json()),
       loadCollection(),
-      fetch('/api/sets').then((r) => r.json()),
+      apiFetch('/api/sets').then((r) => r.json()),
     ]).then(([cardsData, raritiesData, , setsData]) => {
       setCards(cardsData.data ?? []);
       setRarities(raritiesData);
@@ -152,7 +153,7 @@ export default function CardsPage() {
     e.stopPropagation();
     const key = `${card.id}:${finish}`;
     setQuickAdding((s) => new Set(s).add(key));
-    await fetch('/api/collection', {
+    await apiFetch('/api/collection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildPayload(card, { quantity: 1, condition: 'mint', finish, wishlist: false })),
@@ -165,9 +166,9 @@ export default function CardsPage() {
     e.stopPropagation();
     const newQty = entry.quantity + delta;
     if (newQty <= 0) {
-      await fetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
     } else {
-      await fetch(`/api/collection/${entry.id}`, {
+      await apiFetch(`/api/collection/${entry.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity: newQty, condition: entry.condition, wishlist: entry.wishlist, notes: entry.notes }),
@@ -177,7 +178,7 @@ export default function CardsPage() {
   };
 
   const handleSave = async (payload) => {
-    await fetch('/api/collection', {
+    await apiFetch('/api/collection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -186,7 +187,7 @@ export default function CardsPage() {
   };
 
   const handleDelete = async (id) => {
-    await fetch(`/api/collection/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
     await loadCollection();
   };
 
