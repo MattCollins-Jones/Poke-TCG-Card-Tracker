@@ -7,6 +7,7 @@ export default function SetsPage() {
   const [collectionSummary, setCollectionSummary] = useState({});
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -14,12 +15,13 @@ export default function SetsPage() {
       apiFetch('/api/sets').then((r) => r.json()),
       apiFetch('/api/collection/summary').then((r) => r.json()),
     ]).then(([setsData, summary]) => {
+      if (setsData.error) { setError(setsData.error); setLoading(false); return; }
       setSets(setsData.data ?? []);
       const map = {};
-      summary.forEach((s) => { map[s.set_id] = s.owned_cards; });
+      (summary ?? []).forEach((s) => { map[s.set_id] = s.owned_cards; });
       setCollectionSummary(map);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((e) => { setError(e.message); setLoading(false); });
   }, []);
 
   const filtered = sets.filter((s) =>
@@ -36,6 +38,7 @@ export default function SetsPage() {
   }, {});
 
   if (loading) return <div className="loading">Loading sets…</div>;
+  if (error) return <div className="loading" style={{ color: '#ef9a9a' }}>Error: {error}</div>;
 
   return (
     <div>
