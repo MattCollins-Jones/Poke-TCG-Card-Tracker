@@ -11,17 +11,25 @@ export default function SetsPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/api/sets').then((r) => r.json()),
-      apiFetch('/api/collection/summary').then((r) => r.json()),
-    ]).then(([setsData, summary]) => {
-      if (setsData.error) { setError(setsData.error); setLoading(false); return; }
-      setSets(setsData.data ?? []);
-      const map = {};
-      (summary ?? []).forEach((s) => { map[s.set_id] = s.owned_cards; });
-      setCollectionSummary(map);
-      setLoading(false);
-    }).catch((e) => { setError(e.message); setLoading(false); });
+    apiFetch('/api/sets')
+      .then((r) => r.json())
+      .then((setsData) => {
+        if (setsData.error) { setError(setsData.error); setLoading(false); return; }
+        setSets(setsData.data ?? []);
+        setLoading(false);
+      })
+      .catch((e) => { setError(e.message); setLoading(false); });
+
+    // Load collection summary separately — failure just means 0 counts shown
+    apiFetch('/api/collection/summary')
+      .then((r) => r.json())
+      .then((summary) => {
+        if (!Array.isArray(summary)) return;
+        const map = {};
+        summary.forEach((s) => { map[s.set_id] = s.owned_cards; });
+        setCollectionSummary(map);
+      })
+      .catch(() => {});
   }, []);
 
   const filtered = sets.filter((s) =>
