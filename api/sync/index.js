@@ -72,9 +72,18 @@ export default async function handler(req, res) {
       }
       log(`Upserted ${sets.length} sets. Fetching set details…`);
 
-      // Fetch set details + collect card IDs not already in DB
-      const { data: existingCards } = await supabase.from('cards').select('id');
-      const existingIds = new Set((existingCards ?? []).map((c) => c.id));
+      // Fetch ALL existing card IDs — paginate because Supabase caps at 1000 rows per request
+      const existingIds = new Set();
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data: page } = await supabase.from('cards').select('id').range(from, from + PAGE - 1);
+        if (!page || page.length === 0) break;
+        page.forEach((c) => existingIds.add(c.id));
+        if (page.length < PAGE) break;
+        from += PAGE;
+      }
+      log(`Found ${existingIds.size} cards already in DB.`);
 
       const pendingCardIds = [];
       for (let i = 0; i < sets.length; i += BATCH) {
