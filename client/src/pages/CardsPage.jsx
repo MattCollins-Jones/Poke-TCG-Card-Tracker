@@ -83,18 +83,27 @@ export default function CardsPage() {
 
   useEffect(() => {
     // Load cards + sets info — collection is loaded separately so it can't block cards
-    Promise.all([
+    // Use allSettled so a rarities or sets failure never blocks the cards grid
+    Promise.allSettled([
       apiFetch(`/api/cards/${setId}`).then((r) => r.json()),
       apiFetch(`/api/cards/rarities/${setId}`).then((r) => r.json()),
       apiFetch('/api/sets').then((r) => r.json()),
-    ]).then(([cardsData, raritiesData, setsData]) => {
-      if (cardsData.error) { setLoadError(cardsData.error); setLoading(false); return; }
-      setCards(cardsData.data ?? []);
-      setRarities(Array.isArray(raritiesData) ? raritiesData : []);
-      const found = (setsData.data ?? []).find((s) => s.id === setId);
-      setSetInfo(found);
+    ]).then(([cardsResult, raritiesResult, setsResult]) => {
+      if (cardsResult.status === 'rejected' || cardsResult.value?.error) {
+        setLoadError(cardsResult.value?.error ?? cardsResult.reason?.message ?? 'Failed to load cards');
+        setLoading(false);
+        return;
+      }
+      setCards(cardsResult.value.data ?? []);
+      if (raritiesResult.status === 'fulfilled' && Array.isArray(raritiesResult.value)) {
+        setRarities(raritiesResult.value);
+      }
+      if (setsResult.status === 'fulfilled' && setsResult.value?.data) {
+        const found = setsResult.value.data.find((s) => s.id === setId);
+        setSetInfo(found);
+      }
       setLoading(false);
-    }).catch((e) => { setLoadError(e.message); setLoading(false); });
+    });
 
     loadCollection();
   }, [setId, loadCollection]);

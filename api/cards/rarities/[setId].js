@@ -6,15 +6,19 @@ export default async function handler(req, res) {
   const { setId } = req.query;
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
-    .from('cards')
-    .select('rarity')
-    .eq('set_id', setId)
-    .not('rarity', 'is', null)
-    .order('rarity');
+  try {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('rarity')
+      .eq('set_id', setId)
+      .not('rarity', 'is', null)
+      .order('rarity');
 
-  if (error) return res.status(500).json({ error: error.message });
+    if (error) return res.status(500).json({ error: error.message });
 
-  const rarities = [...new Set(data.map((r) => r.rarity))];
-  res.json(rarities);
+    const rarities = [...new Set((data ?? []).map((r) => r.rarity))];
+    res.json(rarities);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }
