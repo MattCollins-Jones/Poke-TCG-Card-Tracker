@@ -50,6 +50,7 @@ export default function CardsPage() {
     try { return parseInt(localStorage.getItem('ui:gridCols') ?? '7', 10); } catch { return 7; }
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
   const [quickAdding, setQuickAdding] = useState(new Set());
 
@@ -87,12 +88,13 @@ export default function CardsPage() {
       apiFetch(`/api/cards/rarities/${setId}`).then((r) => r.json()),
       apiFetch('/api/sets').then((r) => r.json()),
     ]).then(([cardsData, raritiesData, setsData]) => {
+      if (cardsData.error) { setLoadError(cardsData.error); setLoading(false); return; }
       setCards(cardsData.data ?? []);
       setRarities(Array.isArray(raritiesData) ? raritiesData : []);
       const found = (setsData.data ?? []).find((s) => s.id === setId);
       setSetInfo(found);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((e) => { setLoadError(e.message); setLoading(false); });
 
     loadCollection();
   }, [setId, loadCollection]);
@@ -196,6 +198,12 @@ export default function CardsPage() {
   };
 
   if (loading) return <div className="loading">Loading cards…</div>;
+  if (loadError) return (
+    <div style={{ padding: 32 }}>
+      <button className="back-btn" onClick={() => navigate('/')}>← Back to Sets</button>
+      <div className="loading" style={{ color: '#ef9a9a', marginTop: 16 }}>Error loading cards: {loadError}</div>
+    </div>
+  );
 
   const ownedCount = cards.filter((c) => (collection[c.id] ?? []).some((e) => !e.wishlist)).length;
 
