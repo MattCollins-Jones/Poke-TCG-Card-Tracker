@@ -1,4 +1,4 @@
-import { createServiceClient, requireUser } from '../../lib/supabase.js';
+import { createServiceClient, requireUser } from '../lib/supabase.js';
 
 export default async function handler(req, res) {
   const supabase = createServiceClient();
