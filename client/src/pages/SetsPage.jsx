@@ -68,7 +68,17 @@ export default function SetsPage() {
           <div className="sets-grid">
             {seriesSets.map((set) => (
             <div key={set.id} className="set-card" onClick={() => navigate(`/sets/${set.id}`)}>
-                {set.images?.logo && <img src={set.images.logo} alt={set.name} />}
+                {set.images?.logo ? (
+                  <img src={set.images.logo} alt={set.name} />
+                ) : set.images?.symbol ? (
+                  <div className="set-symbol-fallback">
+                    <img src={set.images.symbol} alt={set.name} className="set-symbol-img" />
+                  </div>
+                ) : (
+                  <div className="set-logo-placeholder">
+                    <span>{set.name}</span>
+                  </div>
+                )}
                 <div className="set-name">{set.name}</div>
                 <div className="set-meta">
                   {collectionSummary[set.id]
