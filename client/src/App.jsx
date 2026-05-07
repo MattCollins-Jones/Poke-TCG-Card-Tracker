@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
+import AdminGuard from './components/AdminGuard.jsx';
 import NavBar from './components/NavBar.jsx';
 import SetsPage from './pages/SetsPage.jsx';
 import CardsPage from './pages/CardsPage.jsx';
 import CollectionPage from './pages/CollectionPage.jsx';
 import WishlistPage from './pages/WishlistPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
+import AdminPage from './pages/AdminPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
@@ -25,6 +27,7 @@ export default function App() {
                   <Route path="/collection" element={<CollectionPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
                   <Route path="/sync" element={<SyncPage />} />
+                  <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
                 </Routes>
               </main>
             </AuthGuard>
