@@ -885,3 +885,16 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 .admin-err { color: #ef9a9a; font-size: 0.8rem; }
 
 .btn-secondary { background: var(--surface2); color: var(--text); }
+
+.admin-vis-btn {
+  background: none;
+  border: 1px solid var(--surface2);
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+.admin-vis-btn:hover { background: var(--surface2); border-color: var(--yellow); }
+.admin-vis-btn:disabled { opacity: 0.4; cursor: not-allowed; }

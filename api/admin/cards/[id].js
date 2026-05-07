@@ -23,6 +23,8 @@ export default async function handler(req, res) {
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key] || null;
     }
+    // hidden is boolean — handle separately so false isn't treated as null
+    if ('hidden' in req.body) updates.hidden = Boolean(req.body.hidden);
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }

@@ -1,27 +1,49 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/apiFetch.js';
+
+// ── Shared toggle helper ──────────────────────────────────────────────────────
+
+async function toggleHidden(endpoint, id, currentHidden, setItems, setToggling) {
+  setToggling(prev => ({ ...prev, [id]: true }));
+  try {
+    const res = await apiFetch(`${endpoint}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hidden: !currentHidden }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    setItems(prev => prev.map(item => item.id !== id ? item : { ...item, hidden: !currentHidden }));
+  } catch (e) {
+    alert(`Failed to update visibility: ${e.message}`);
+  }
+  setToggling(prev => ({ ...prev, [id]: false }));
+}
 
 // ── Sets Admin Tab ────────────────────────────────────────────────────────────
 
 function SetsAdmin() {
   const [sets, setSets] = useState([]);
   const [search, setSearch] = useState('');
+  const [showHidden, setShowHidden] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
+  const [toggling, setToggling] = useState({});
   const [edits, setEdits] = useState({});
   const [feedback, setFeedback] = useState({});
 
   useEffect(() => {
-    apiFetch('/api/sets').then(r => r.json()).then(d => {
+    apiFetch('/api/admin/sets').then(r => r.json()).then(d => {
       setSets(d.data ?? []);
       setLoading(false);
     });
   }, []);
 
-  const filtered = sets.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    (s.series ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = sets.filter(s => {
+    if (!showHidden && s.hidden) return false;
+    return s.name.toLowerCase().includes(search.toLowerCase()) ||
+      (s.series ?? '').toLowerCase().includes(search.toLowerCase());
+  });
 
   const getEdit = (id, field, fallback) =>
     edits[id]?.[field] !== undefined ? edits[id][field] : (fallback ?? '');
@@ -46,7 +68,6 @@ function SetsAdmin() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      // Apply edits to local state
       setSets(prev => prev.map(s => s.id !== set.id ? s : {
         ...s,
         name: patch.name ?? s.name,
@@ -67,17 +88,25 @@ function SetsAdmin() {
 
   if (loading) return <div className="loading">Loading sets…</div>;
 
+  const hiddenCount = sets.filter(s => s.hidden).length;
+
   return (
     <div>
-      <input
-        className="search-input"
-        placeholder="Search sets…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ marginBottom: 16 }}
-      />
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          className="search-input"
+          placeholder="Search sets…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 180 }}
+        />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.88rem', color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={showHidden} onChange={e => setShowHidden(e.target.checked)} style={{ accentColor: 'var(--yellow)' }} />
+          Show hidden ({hiddenCount})
+        </label>
+      </div>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 16 }}>
-        {filtered.length} sets · Edit logo/symbol URLs or name/series inline, then click Save.
+        {filtered.length} sets · Edit inline then Save · 👁 toggles visibility
       </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -94,7 +123,7 @@ function SetsAdmin() {
           </thead>
           <tbody>
             {filtered.map(set => (
-              <tr key={set.id}>
+              <tr key={set.id} style={set.hidden ? { opacity: 0.45 } : {}}>
                 <td className="admin-preview">
                   {(edits[set.id]?.logo_image ?? set.images?.logo) ? (
                     <img src={edits[set.id]?.logo_image ?? set.images?.logo} alt="" onError={e => e.target.style.display='none'} />
@@ -134,19 +163,29 @@ function SetsAdmin() {
                   />
                 </td>
                 <td className="admin-actions">
-                  {feedback[set.id] ? (
-                    <span className={feedback[set.id] === 'saved' ? 'admin-ok' : 'admin-err'}>
-                      {feedback[set.id] === 'saved' ? '✓ Saved' : feedback[set.id]}
-                    </span>
-                  ) : (
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <button
-                      className="btn-primary admin-save-btn"
-                      onClick={() => save(set)}
-                      disabled={saving[set.id] || !edits[set.id]}
+                      className="admin-vis-btn"
+                      title={set.hidden ? 'Show set' : 'Hide set'}
+                      onClick={() => toggleHidden('/api/admin/sets', set.id, set.hidden, setSets, setToggling)}
+                      disabled={toggling[set.id]}
                     >
-                      {saving[set.id] ? '…' : 'Save'}
+                      {set.hidden ? '🙈' : '👁'}
                     </button>
-                  )}
+                    {feedback[set.id] ? (
+                      <span className={feedback[set.id] === 'saved' ? 'admin-ok' : 'admin-err'}>
+                        {feedback[set.id] === 'saved' ? '✓' : feedback[set.id]}
+                      </span>
+                    ) : (
+                      <button
+                        className="btn-primary admin-save-btn"
+                        onClick={() => save(set)}
+                        disabled={saving[set.id] || !edits[set.id]}
+                      >
+                        {saving[set.id] ? '…' : 'Save'}
+                      </button>
+                    )}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -165,13 +204,15 @@ function CardsAdmin() {
   const [cards, setCards] = useState([]);
   const [loadingCards, setLoadingCards] = useState(false);
   const [search, setSearch] = useState('');
+  const [showHidden, setShowHidden] = useState(true);
   const [saving, setSaving] = useState({});
+  const [toggling, setToggling] = useState({});
   const [edits, setEdits] = useState({});
   const [feedback, setFeedback] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
-    apiFetch('/api/sets').then(r => r.json()).then(d => setSets(d.data ?? []));
+    apiFetch('/api/admin/sets').then(r => r.json()).then(d => setSets(d.data ?? []));
   }, []);
 
   useEffect(() => {
@@ -179,16 +220,17 @@ function CardsAdmin() {
     setLoadingCards(true);
     setCards([]);
     setEdits({});
-    apiFetch(`/api/cards/${selectedSet}`)
+    apiFetch(`/api/admin/cards?setId=${selectedSet}`)
       .then(r => r.json())
       .then(d => { setCards(d.data ?? []); setLoadingCards(false); })
       .catch(() => setLoadingCards(false));
   }, [selectedSet]);
 
-  const filtered = cards.filter(c =>
-    c.name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.number?.toString().includes(search)
-  );
+  const filtered = cards.filter(c => {
+    if (!showHidden && c.hidden) return false;
+    return c.name?.toLowerCase().includes(search.toLowerCase()) ||
+      c.number?.toString().includes(search);
+  });
 
   const getEdit = (id, field, fallback) =>
     edits[id]?.[field] !== undefined ? edits[id][field] : (fallback ?? '');
@@ -232,9 +274,11 @@ function CardsAdmin() {
     setConfirmDelete(null);
   };
 
+  const hiddenCount = cards.filter(c => c.hidden).length;
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <select
           className="filter-select"
           value={selectedSet}
@@ -242,7 +286,7 @@ function CardsAdmin() {
           style={{ minWidth: 220 }}
         >
           <option value="">— Select a set —</option>
-          {sets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {sets.map(s => <option key={s.id} value={s.id}>{s.hidden ? '🙈 ' : ''}{s.name}</option>)}
         </select>
         {selectedSet && (
           <input
@@ -252,6 +296,12 @@ function CardsAdmin() {
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 180 }}
           />
+        )}
+        {selectedSet && cards.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.88rem', color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={showHidden} onChange={e => setShowHidden(e.target.checked)} style={{ accentColor: 'var(--yellow)' }} />
+            Show hidden ({hiddenCount})
+          </label>
         )}
       </div>
 
@@ -264,7 +314,7 @@ function CardsAdmin() {
       {selectedSet && !loadingCards && cards.length > 0 && (
         <>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 16 }}>
-            {filtered.length} cards · Edit inline then click Save, or Delete to remove.
+            {filtered.length} cards · 👁 toggles visibility · Edit inline then Save
           </p>
           <div className="admin-table-wrap">
             <table className="admin-table">
@@ -280,7 +330,7 @@ function CardsAdmin() {
               </thead>
               <tbody>
                 {filtered.map(card => (
-                  <tr key={card.id}>
+                  <tr key={card.id} style={card.hidden ? { opacity: 0.45 } : {}}>
                     <td className="admin-preview">
                       {(edits[card.id]?.small_image ?? card.images?.small) ? (
                         <img src={edits[card.id]?.small_image ?? card.images?.small} alt="" onError={e => e.target.style.display='none'} />
@@ -310,30 +360,40 @@ function CardsAdmin() {
                       />
                     </td>
                     <td className="admin-actions">
-                      {feedback[card.id] ? (
-                        <span className={feedback[card.id] === 'saved' ? 'admin-ok' : 'admin-err'}>
-                          {feedback[card.id] === 'saved' ? '✓' : '✗'}
-                        </span>
-                      ) : confirmDelete === card.id ? (
-                        <span style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn-danger admin-save-btn" onClick={() => deleteCard(card)} disabled={saving[card.id]}>Confirm</button>
-                          <button className="btn-secondary admin-save-btn" onClick={() => setConfirmDelete(null)}>Cancel</button>
-                        </span>
-                      ) : (
-                        <span style={{ display: 'flex', gap: 4 }}>
-                          <button
-                            className="btn-primary admin-save-btn"
-                            onClick={() => save(card)}
-                            disabled={saving[card.id] || !edits[card.id]}
-                          >
-                            {saving[card.id] ? '…' : 'Save'}
-                          </button>
-                          <button
-                            className="btn-danger admin-save-btn"
-                            onClick={() => setConfirmDelete(card.id)}
-                          >🗑</button>
-                        </span>
-                      )}
+                      <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <button
+                          className="admin-vis-btn"
+                          title={card.hidden ? 'Show card' : 'Hide card'}
+                          onClick={() => toggleHidden('/api/admin/cards', card.id, card.hidden, setCards, setToggling)}
+                          disabled={toggling[card.id]}
+                        >
+                          {card.hidden ? '🙈' : '👁'}
+                        </button>
+                        {feedback[card.id] ? (
+                          <span className={feedback[card.id] === 'saved' ? 'admin-ok' : 'admin-err'}>
+                            {feedback[card.id] === 'saved' ? '✓' : '✗'}
+                          </span>
+                        ) : confirmDelete === card.id ? (
+                          <span style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn-danger admin-save-btn" onClick={() => deleteCard(card)} disabled={saving[card.id]}>Confirm</button>
+                            <button className="btn-secondary admin-save-btn" onClick={() => setConfirmDelete(null)}>Cancel</button>
+                          </span>
+                        ) : (
+                          <span style={{ display: 'flex', gap: 4 }}>
+                            <button
+                              className="btn-primary admin-save-btn"
+                              onClick={() => save(card)}
+                              disabled={saving[card.id] || !edits[card.id]}
+                            >
+                              {saving[card.id] ? '…' : 'Save'}
+                            </button>
+                            <button
+                              className="btn-danger admin-save-btn"
+                              onClick={() => setConfirmDelete(card.id)}
+                            >🗑</button>
+                          </span>
+                        )}
+                      </span>
                     </td>
                   </tr>
                 ))}

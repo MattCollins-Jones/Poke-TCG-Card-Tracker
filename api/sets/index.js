@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   const { data: rows, error } = await supabase
     .from('sets')
     .select('*')
+    .eq('hidden', false)
     .order('release_date', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
