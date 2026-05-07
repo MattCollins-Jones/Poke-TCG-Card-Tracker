@@ -59,14 +59,18 @@ export default async function handler(req, res) {
 
       // Upsert basic set info
       for (let i = 0; i < sets.length; i += BATCH) {
-        const rows = sets.slice(i, i + BATCH).map((s) => ({
-          id: s.id,
-          name: s.name,
-          total: s.cardCount?.total ?? null,
-          printed_total: s.cardCount?.official ?? null,
-          symbol_image: s.symbol ? `${s.symbol}.webp` : null,
-          logo_image: s.logo ? `${s.logo}.webp` : null,
-        }));
+        const rows = sets.slice(i, i + BATCH).map((s) => {
+          const row = {
+            id: s.id,
+            name: s.name,
+            total: s.cardCount?.total ?? null,
+            printed_total: s.cardCount?.official ?? null,
+          };
+          // Only set images if TCGdex provides them — preserves any manually set values
+          if (s.symbol) row.symbol_image = `${s.symbol}.webp`;
+          if (s.logo) row.logo_image = `${s.logo}.webp`;
+          return row;
+        });
         const { error } = await supabase.from('sets').upsert(rows, { onConflict: 'id' });
         if (error) throw new Error(`Sets upsert: ${error.message}`);
       }
@@ -96,8 +100,9 @@ export default async function handler(req, res) {
             release_date: detail.releaseDate ?? null,
             total: detail.cardCount?.total ?? detail.cards?.length ?? null,
             printed_total: detail.cardCount?.official ?? null,
-            symbol_image: detail.symbol ? `${detail.symbol}.webp` : null,
-            logo_image: detail.logo ? `${detail.logo}.webp` : null,
+            // Only overwrite images if TCGdex provides them — preserves manual overrides
+            ...(detail.symbol ? { symbol_image: `${detail.symbol}.webp` } : {}),
+            ...(detail.logo   ? { logo_image:   `${detail.logo}.webp`   } : {}),
           }).eq('id', detail.id);
           if (detail.cards) {
             detail.cards
