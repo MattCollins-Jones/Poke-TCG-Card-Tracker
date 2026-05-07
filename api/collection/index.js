@@ -7,7 +7,43 @@ export default async function handler(req, res) {
     const user = await requireUser(req, res);
     if (!user) return;
 
-    const { wishlist, set_id } = req.query;
+    const { wishlist, set_id, mode } = req.query;
+
+    // ?mode=summary — per-set owned card counts (used by SetsPage)
+    if (mode === 'summary') {
+      const { data, error } = await supabase
+        .from('collection')
+        .select('set_id, card_id')
+        .eq('user_id', user.id)
+        .eq('wishlist', false);
+
+      if (error) return res.status(500).json({ error: error.message });
+
+      const summary = {};
+      (data ?? []).forEach(({ set_id: sid, card_id }) => {
+        if (!summary[sid]) summary[sid] = new Set();
+        summary[sid].add(card_id);
+      });
+
+      return res.json(
+        Object.entries(summary).map(([sid, cards]) => ({
+          set_id: sid,
+          owned_cards: cards.size,
+        }))
+      );
+    }
+
+    // ?mode=ids — lightweight card_id + quantity list
+    if (mode === 'ids') {
+      const { data, error } = await supabase
+        .from('collection')
+        .select('card_id, quantity, wishlist')
+        .eq('user_id', user.id);
+
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json(data ?? []);
+    }
+
     let query = supabase
       .from('collection')
       .select('*')

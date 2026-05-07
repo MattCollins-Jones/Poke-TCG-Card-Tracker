@@ -21,7 +21,7 @@ export default function SetsPage() {
       .catch((e) => { setError(e.message); setLoading(false); });
 
     // Load collection summary separately — failure just means 0 counts shown
-    apiFetch('/api/collection/summary')
+    apiFetch('/api/collection?mode=summary')
       .then((r) => r.json())
       .then((summary) => {
         if (!Array.isArray(summary)) return;
