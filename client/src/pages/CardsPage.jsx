@@ -47,7 +47,11 @@ export default function CardsPage() {
   const [search, setSearch] = useState('');
   const [unstacked, setUnstacked] = useState(saved.unstacked ?? false);
   const [gridCols, setGridCols] = useState(() => {
-    try { return parseInt(localStorage.getItem('ui:gridCols') ?? '7', 10); } catch { return 7; }
+    try {
+      const saved = localStorage.getItem('ui:gridCols');
+      if (saved) return parseInt(saved, 10);
+      return window.innerWidth < 640 ? 3 : 7;
+    } catch { return 7; }
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -299,7 +303,7 @@ export default function CardsPage() {
         </div>
       )}
 
-      <div className="cards-grid" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
+      <div className="cards-grid" style={{ '--grid-cols': gridCols }}>
         {displayItems.map(({ card, finish }) => {
           const entries = collection[card.id] ?? [];
           const allOwnedEntries = entries.filter((e) => !e.wishlist);

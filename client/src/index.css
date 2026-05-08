@@ -132,7 +132,7 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 /* ── Cards grid ── */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr); /* overridden inline per user preference */
+  grid-template-columns: repeat(var(--grid-cols, 7), 1fr);
   gap: 14px;
 }
 
@@ -207,6 +207,8 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   padding: 24px;
   width: 100%;
   max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   border: 1px solid var(--surface2);
 }
@@ -790,6 +792,59 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   .splash-cards-container { height: 160px; max-width: 320px; }
   .splash-card { width: 82px; height: 116px; }
   .login-features { display: none; }
+}
+
+/* ── Mobile: general layout ── */
+@media (max-width: 640px) {
+  .main-content { padding: 14px 10px; }
+
+  /* Navbar: hide email, tighten gaps */
+  .navbar { padding: 0 10px; gap: 8px; height: auto; min-height: 56px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+  .navbar-brand { font-size: 1.05rem; }
+  .navbar a { padding: 3px 6px; font-size: 0.85rem; }
+  .navbar-email { display: none; }
+  .navbar-user { gap: 6px; }
+  .navbar-signout { padding: 4px 8px; }
+
+  /* Search input: full width */
+  .search-input { width: 100%; }
+
+  /* Filter bar: tighter, col-picker on own line */
+  .filter-bar { gap: 6px; }
+  .col-picker { margin-left: 0; }
+  .filter-btn { padding: 7px 10px; font-size: 0.82rem; }
+
+  /* Cards grid: cap at 4 columns on mobile */
+  .cards-grid {
+    grid-template-columns: repeat(min(var(--grid-cols, 3), 4), 1fr);
+    gap: 8px;
+  }
+
+  /* Card info: smaller text */
+  .card-item-name { font-size: 0.72rem; }
+  .card-item-number { font-size: 0.68rem; }
+  .card-item-info { padding: 5px 6px; }
+
+  /* Stats bar: stretch chips to fill width */
+  .stats-bar { gap: 10px; }
+  .stat-chip { min-width: 0; flex: 1; padding: 8px 12px; }
+
+  /* Back button */
+  .back-btn { font-size: 0.82rem; padding: 5px 10px; }
+
+  /* Modal: smaller image, tighter padding */
+  .modal { padding: 16px; border-radius: 10px; }
+  .modal-header img { width: 76px; }
+  .modal-header { gap: 12px; }
+  .modal-header-info h2 { font-size: 0.95rem; }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .btn { flex: 1; min-width: 0; text-align: center; }
+
+  /* Sets grid: smaller min size */
+  .sets-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+
+  /* H1 size */
+  h1 { font-size: 1.4rem; }
 }
 
 /* ── Admin page ── */
