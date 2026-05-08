@@ -41,6 +41,7 @@ export default async function handler(req, res) {
 
   // phase=sets  → sync sets list + collect all card IDs, store pending IDs in sync_meta
   // phase=cards → fetch next batch of pending card IDs from sync_meta, upsert, advance cursor
+  // phase=prices → fetch next batch of ALL card IDs and update pricing columns only
   // phase=auto  → run sets phase then as many card batches as time allows (default)
   const phase = req.query.phase ?? 'auto';
   const CARD_BATCH_SIZE = 200; // cards per invocation
@@ -188,6 +189,87 @@ export default async function handler(req, res) {
 
       res.end();
     }
+    // Prices phase — fetch pricing for all cards in batches, update price columns only
+    if (phase === 'prices') {
+      // Load cursor from sync_meta
+      const { data: metaRows } = await supabase
+        .from('sync_meta')
+        .select('key, value')
+        .in('key', ['price_cursor']);
+      const meta = Object.fromEntries((metaRows ?? []).map((r) => [r.key, r.value]));
+      const cursor = parseInt(meta.price_cursor ?? '0', 10);
+
+      // Paginate all card IDs from DB
+      const allIds = [];
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data: page } = await supabase.from('cards').select('id').range(from, from + PAGE - 1);
+        if (!page || page.length === 0) break;
+        page.forEach((c) => allIds.push(c.id));
+        if (page.length < PAGE) break;
+        from += PAGE;
+      }
+
+      if (allIds.length === 0) {
+        log('No cards in DB — run a card sync first.');
+        return res.end();
+      }
+
+      const slice = allIds.slice(cursor, cursor + CARD_BATCH_SIZE);
+      log(`Syncing prices for cards ${cursor + 1}–${cursor + slice.length} of ${allIds.length}…`);
+
+      for (let i = 0; i < slice.length; i += BATCH) {
+        const batch = slice.slice(i, i + BATCH);
+        const cards = await fetchBatch(batch.map((id) => `${API}/cards/${id}`));
+        const rows = cards.filter(Boolean).map((card) => {
+          const cm = card.pricing?.cardmarket;
+          const tcp = card.pricing?.tcgplayer;
+          return {
+            id: card.id,
+            ...(cm ? {
+              cm_trend: cm.trend ?? null,
+              cm_avg30: cm.avg30 ?? null,
+              cm_low: cm.low ?? null,
+              cm_trend_holo: cm['trend-holo'] ?? null,
+              cm_avg30_holo: cm['avg30-holo'] ?? null,
+            } : {}),
+            ...(tcp ? {
+              tcp_normal_market: tcp.normal?.marketPrice ?? null,
+              tcp_normal_low: tcp.normal?.lowPrice ?? null,
+              tcp_reverse_market: tcp.reverse?.marketPrice ?? null,
+            } : {}),
+            price_updated_at: new Date().toISOString(),
+          };
+        }).filter((r) => Object.keys(r).length > 1); // skip cards with no pricing data
+
+        if (rows.length) {
+          const { error } = await supabase.from('cards').upsert(rows, { onConflict: 'id' });
+          if (error) throw new Error(`Prices upsert: ${error.message}`);
+        }
+        await sleep(80);
+      }
+
+      const newCursor = cursor + slice.length;
+      const remaining = allIds.length - newCursor;
+
+      if (remaining <= 0) {
+        await supabase.from('sync_meta').upsert([
+          { key: 'price_cursor', value: '0' },
+          { key: 'last_price_sync', value: new Date().toISOString() },
+        ], { onConflict: 'key' });
+        log(`Price sync complete! Updated prices for ${allIds.length} cards.`);
+      } else {
+        await supabase.from('sync_meta').upsert(
+          { key: 'price_cursor', value: String(newCursor) },
+          { onConflict: 'key' }
+        );
+        log(`Batch complete. ${remaining} cards remaining — click "Continue Prices" to sync next batch.`);
+      }
+
+      return res.end();
+    }
+
   } catch (err) {
     log(`Error: ${err.message}`);
     res.end();

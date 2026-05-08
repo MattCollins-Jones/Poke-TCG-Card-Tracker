@@ -6,12 +6,14 @@ export default function SyncPage() {
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [hasPriceMore, setHasPriceMore] = useState(false);
 
   const runPhase = async (phase) => {
     setRunning(true);
     setDone(false);
     setHasMore(false);
     if (phase === 'auto') setLog(['Starting sync…']);
+    else if (phase === 'prices') setLog((prev) => [...prev, '--- Starting price sync ---']);
     else setLog((prev) => [...prev, `--- Continuing (${phase}) ---`]);
 
     try {
@@ -19,8 +21,14 @@ export default function SyncPage() {
       const text = await res.text();
       const lines = text.split('\n').filter(Boolean);
       setLog((prev) => [...prev, ...lines]);
-      setHasMore(lines.some((l) => l.includes('remaining')));
-      setDone(!lines.some((l) => l.includes('remaining')));
+
+      const hasRemaining = lines.some((l) => l.includes('remaining'));
+      if (phase === 'prices') {
+        setHasPriceMore(hasRemaining);
+      } else {
+        setHasMore(hasRemaining);
+      }
+      setDone(!hasRemaining && phase !== 'prices');
     } catch (err) {
       setLog((prev) => [...prev, `Error: ${err.message}`]);
     }
@@ -48,8 +56,27 @@ export default function SyncPage() {
         )}
       </div>
 
+      <hr style={{ border: 'none', borderTop: '1px solid var(--surface2)', margin: '20px 0' }} />
+
+      <h2 style={{ fontSize: '1rem', marginBottom: 8 }}>💰 Price Sync</h2>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: 14 }}>
+        Fetches Cardmarket and TCGPlayer market prices for every card.
+        Run this weekly — prices do not update automatically.
+        Runs in batches like the card sync.
+      </p>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <button className="btn btn-secondary" onClick={() => runPhase('prices')} disabled={running}>
+          {running ? '⏳ Syncing…' : '💰 Sync Prices'}
+        </button>
+        {hasPriceMore && !running && (
+          <button className="btn btn-secondary" onClick={() => runPhase('prices')} disabled={running}>
+            ▶ Continue Price Batch
+          </button>
+        )}
+      </div>
+
       {log.length > 0 && (
-        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 20 }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 20, marginTop: 20 }}>
           {done && (
             <div style={{ marginBottom: 12, fontWeight: 600, color: '#4caf50' }}>
               ✅ Sync complete
@@ -58,6 +85,11 @@ export default function SyncPage() {
           {hasMore && !running && (
             <div style={{ marginBottom: 12, fontWeight: 600, color: 'var(--yellow)' }}>
               ⏳ More cards to sync — click <strong>Continue Next Batch</strong>
+            </div>
+          )}
+          {hasPriceMore && !running && (
+            <div style={{ marginBottom: 12, fontWeight: 600, color: 'var(--yellow)' }}>
+              ⏳ More prices to sync — click <strong>Continue Price Batch</strong>
             </div>
           )}
           <div style={{
@@ -72,5 +104,4 @@ export default function SyncPage() {
     </div>
   );
 }
-
 

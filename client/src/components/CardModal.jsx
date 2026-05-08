@@ -83,6 +83,38 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
           </div>
         </div>
 
+        {card.pricing && (
+          <div className="pricing-section">
+            <div className="pricing-title">Market Prices</div>
+            <div className="pricing-grid">
+              {card.pricing.cardmarket && (
+                <div className="pricing-source">
+                  <span className="pricing-source-label">🏩 Cardmarket (EUR)</span>
+                  <div className="pricing-rows">
+                    {card.pricing.cardmarket.trend != null && <span>Trend <strong>€{card.pricing.cardmarket.trend.toFixed(2)}</strong></span>}
+                    {card.pricing.cardmarket.avg30 != null && <span>30-day avg <strong>€{card.pricing.cardmarket.avg30.toFixed(2)}</strong></span>}
+                    {card.pricing.cardmarket.low != null && <span>Low <strong>€{card.pricing.cardmarket.low.toFixed(2)}</strong></span>}
+                    {card.pricing.cardmarket.trendHolo != null && <span>Holo trend <strong>€{card.pricing.cardmarket.trendHolo.toFixed(2)}</strong></span>}
+                  </div>
+                </div>
+              )}
+              {card.pricing.tcgplayer && (
+                <div className="pricing-source">
+                  <span className="pricing-source-label">🏦 TCGPlayer (USD)</span>
+                  <div className="pricing-rows">
+                    {card.pricing.tcgplayer.normalMarket != null && <span>Market <strong>${card.pricing.tcgplayer.normalMarket.toFixed(2)}</strong></span>}
+                    {card.pricing.tcgplayer.normalLow != null && <span>Low <strong>${card.pricing.tcgplayer.normalLow.toFixed(2)}</strong></span>}
+                    {card.pricing.tcgplayer.reverseMarket != null && <span>Reverse market <strong>${card.pricing.tcgplayer.reverseMarket.toFixed(2)}</strong></span>}
+                  </div>
+                </div>
+              )}
+            </div>
+            {card.pricing.updatedAt && (
+              <div className="pricing-updated">Updated {new Date(card.pricing.updatedAt).toLocaleDateString()}</div>
+            )}
+          </div>
+        )}
+
         <div className="form-group">
           <label>Finish</label>
           {availableFinishes.length === 1 ? (

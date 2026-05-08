@@ -898,3 +898,52 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 }
 .admin-vis-btn:hover { background: var(--surface2); border-color: var(--yellow); }
 .admin-vis-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Pricing ── */
+.pricing-section {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+}
+.pricing-title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.pricing-grid {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.pricing-source {
+  flex: 1;
+  min-width: 130px;
+}
+.pricing-source-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--yellow);
+  font-size: 0.8rem;
+}
+.pricing-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-muted);
+}
+.pricing-rows strong {
+  color: var(--text);
+  margin-left: 4px;
+}
+.pricing-updated {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
