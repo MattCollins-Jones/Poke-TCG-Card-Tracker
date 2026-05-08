@@ -44,7 +44,7 @@ export default async function handler(req, res) {
   // phase=prices → fetch next batch of ALL card IDs and update pricing columns only
   // phase=auto  → run sets phase then as many card batches as time allows (default)
   const phase = req.query.phase ?? 'auto';
-  const CARD_BATCH_SIZE = 200; // cards per invocation
+  const CARD_BATCH_SIZE = 1000; // cards per invocation
 
   res.setHeader('Content-Type', 'text/plain');
   const log = (msg) => { console.log('[sync]', msg); try { res.write(msg + '\n'); } catch {} };
