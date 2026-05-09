@@ -65,6 +65,19 @@ body {
 .navbar-signout { background: transparent; border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; }
 .navbar-signout:hover { background: var(--surface2); color: var(--yellow); }
 
+.currency-select {
+  background: var(--surface2);
+  border: 1px solid var(--surface2);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.currency-select:hover, .currency-select:focus { border-color: var(--yellow); }
+
 /* ── Page headers ── */
 h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 20px; }
 h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }

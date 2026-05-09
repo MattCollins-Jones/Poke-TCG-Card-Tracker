@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useCurrency, CURRENCIES } from '../context/CurrencyContext.jsx';
 
 export default function NavBar() {
   const { user, signOut, isAdmin } = useAuth();
+  const { currency, setCurrency } = useCurrency();
 
   return (
     <nav className="navbar">
@@ -16,6 +18,16 @@ export default function NavBar() {
       {isAdmin && (
         <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''} style={{ fontSize: '0.85rem' }}>⚙️ Admin</NavLink>
       )}
+      <select
+        className="currency-select"
+        value={currency}
+        onChange={(e) => setCurrency(e.target.value)}
+        title="Display currency"
+      >
+        {CURRENCIES.map((c) => (
+          <option key={c.code} value={c.code}>{c.label}</option>
+        ))}
+      </select>
       {user && (
         <div className="navbar-user">
           <span className="navbar-email">{user.email}</span>

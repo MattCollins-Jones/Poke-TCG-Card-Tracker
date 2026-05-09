@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { CurrencyProvider } from './context/CurrencyContext.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
 import AdminGuard from './components/AdminGuard.jsx';
 import NavBar from './components/NavBar.jsx';
@@ -13,6 +14,7 @@ import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
   return (
+    <CurrencyProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -35,6 +37,7 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </CurrencyProvider>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAvailableFinishes, FINISH_LABELS } from '../utils/finishes.js';
+import { useCurrency } from '../context/CurrencyContext.jsx';
 
 const CONDITIONS = ['mint', 'good', 'played', 'poor'];
 
@@ -15,17 +16,8 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
   const [wishlist, setWishlist] = useState(!firstOwned && collectionEntries.some((e) => e.wishlist));
   const [notes, setNotes] = useState(firstOwned?.finish === finish ? (firstOwned?.notes ?? '') : '');
   const [saving, setSaving] = useState(false);
-  const [gbpRate, setGbpRate] = useState(null);
+  const { convertEur, convertUsd, fmt } = useCurrency();
   const [lightbox, setLightbox] = useState(false);
-
-  // Fetch EUR→GBP rate once when pricing data is present
-  useEffect(() => {
-    if (!card.pricing?.cardmarket) return;
-    fetch('https://open.er-api.com/v6/latest/EUR')
-      .then((r) => r.json())
-      .then((d) => { if (d?.rates?.GBP) setGbpRate(d.rates.GBP); })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When finish changes, load the matching entry's data
   useEffect(() => {
@@ -80,8 +72,6 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
 
   const finishSummary = ownedEntries.map((e) => `${e.finish} ×${e.quantity}`).join(', ');
 
-  const toGbp = (eur) => gbpRate != null ? `£${(eur * gbpRate).toFixed(2)}` : null;
-
   return (
     <>
     {lightbox && (
@@ -126,27 +116,27 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
                   <span className="pricing-source-label">🏩 Cardmarket</span>
                   <div className="pricing-rows">
                     {card.pricing.cardmarket.trend != null && (
-                      <span>Trend <strong>€{card.pricing.cardmarket.trend.toFixed(2)}{toGbp(card.pricing.cardmarket.trend) && <> · {toGbp(card.pricing.cardmarket.trend)}</>}</strong></span>
+                      <span>Trend <strong>{fmt(convertEur(card.pricing.cardmarket.trend))}</strong></span>
                     )}
                     {card.pricing.cardmarket.avg30 != null && (
-                      <span>30-day avg <strong>€{card.pricing.cardmarket.avg30.toFixed(2)}{toGbp(card.pricing.cardmarket.avg30) && <> · {toGbp(card.pricing.cardmarket.avg30)}</>}</strong></span>
+                      <span>30-day avg <strong>{fmt(convertEur(card.pricing.cardmarket.avg30))}</strong></span>
                     )}
                     {card.pricing.cardmarket.low != null && (
-                      <span>Low <strong>€{card.pricing.cardmarket.low.toFixed(2)}{toGbp(card.pricing.cardmarket.low) && <> · {toGbp(card.pricing.cardmarket.low)}</>}</strong></span>
+                      <span>Low <strong>{fmt(convertEur(card.pricing.cardmarket.low))}</strong></span>
                     )}
                     {card.pricing.cardmarket.trendHolo != null && (
-                      <span>Holo trend <strong>€{card.pricing.cardmarket.trendHolo.toFixed(2)}{toGbp(card.pricing.cardmarket.trendHolo) && <> · {toGbp(card.pricing.cardmarket.trendHolo)}</>}</strong></span>
+                      <span>Holo trend <strong>{fmt(convertEur(card.pricing.cardmarket.trendHolo))}</strong></span>
                     )}
                   </div>
                 </div>
               )}
               {card.pricing.tcgplayer && (
                 <div className="pricing-source">
-                  <span className="pricing-source-label">🏦 TCGPlayer (USD)</span>
+                  <span className="pricing-source-label">🏦 TCGPlayer</span>
                   <div className="pricing-rows">
-                    {card.pricing.tcgplayer.normalMarket != null && <span>Market <strong>${card.pricing.tcgplayer.normalMarket.toFixed(2)}</strong></span>}
-                    {card.pricing.tcgplayer.normalLow != null && <span>Low <strong>${card.pricing.tcgplayer.normalLow.toFixed(2)}</strong></span>}
-                    {card.pricing.tcgplayer.reverseMarket != null && <span>Reverse market <strong>${card.pricing.tcgplayer.reverseMarket.toFixed(2)}</strong></span>}
+                    {card.pricing.tcgplayer.normalMarket != null && <span>Market <strong>{fmt(convertUsd(card.pricing.tcgplayer.normalMarket))}</strong></span>}
+                    {card.pricing.tcgplayer.normalLow != null && <span>Low <strong>{fmt(convertUsd(card.pricing.tcgplayer.normalLow))}</strong></span>}
+                    {card.pricing.tcgplayer.reverseMarket != null && <span>Reverse market <strong>{fmt(convertUsd(card.pricing.tcgplayer.reverseMarket))}</strong></span>}
                   </div>
                 </div>
               )}
