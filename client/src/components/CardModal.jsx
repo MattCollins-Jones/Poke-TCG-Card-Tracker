@@ -97,6 +97,7 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
     )}
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
+        <button className="modal-close-btn" onClick={onClose} title="Close">✕</button>
         <div className="modal-header">
           {card.images?.small && (
             <img
