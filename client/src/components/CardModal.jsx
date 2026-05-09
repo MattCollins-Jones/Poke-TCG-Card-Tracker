@@ -15,6 +15,17 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
   const [wishlist, setWishlist] = useState(!firstOwned && collectionEntries.some((e) => e.wishlist));
   const [notes, setNotes] = useState(firstOwned?.finish === finish ? (firstOwned?.notes ?? '') : '');
   const [saving, setSaving] = useState(false);
+  const [gbpRate, setGbpRate] = useState(null);
+  const [lightbox, setLightbox] = useState(false);
+
+  // Fetch EUR→GBP rate once when pricing data is present
+  useEffect(() => {
+    if (!card.pricing?.cardmarket) return;
+    fetch('https://open.er-api.com/v6/latest/EUR')
+      .then((r) => r.json())
+      .then((d) => { if (d?.rates?.GBP) setGbpRate(d.rates.GBP); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When finish changes, load the matching entry's data
   useEffect(() => {
@@ -69,11 +80,33 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
 
   const finishSummary = ownedEntries.map((e) => `${e.finish} ×${e.quantity}`).join(', ');
 
+  const toGbp = (eur) => gbpRate != null ? `£${(eur * gbpRate).toFixed(2)}` : null;
+
   return (
+    <>
+    {lightbox && (
+      <div className="lightbox-overlay" onClick={() => setLightbox(false)}>
+        <img
+          src={card.images?.large ?? card.images?.small}
+          alt={card.name}
+          className="lightbox-img"
+          onClick={(e) => e.stopPropagation()}
+        />
+        <button className="lightbox-close" onClick={() => setLightbox(false)}>✕</button>
+      </div>
+    )}
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          {card.images?.small && <img src={card.images.small} alt={card.name} />}
+          {card.images?.small && (
+            <img
+              src={card.images.small}
+              alt={card.name}
+              className="modal-card-thumb"
+              title="Click to enlarge"
+              onClick={() => setLightbox(true)}
+            />
+          )}
           <div className="modal-header-info">
             <h2>{card.name}</h2>
             <div className="meta">#{card.number} · {setName ?? card.set?.name}</div>
@@ -89,12 +122,20 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
             <div className="pricing-grid">
               {card.pricing.cardmarket && (
                 <div className="pricing-source">
-                  <span className="pricing-source-label">🏩 Cardmarket (EUR)</span>
+                  <span className="pricing-source-label">🏩 Cardmarket</span>
                   <div className="pricing-rows">
-                    {card.pricing.cardmarket.trend != null && <span>Trend <strong>€{card.pricing.cardmarket.trend.toFixed(2)}</strong></span>}
-                    {card.pricing.cardmarket.avg30 != null && <span>30-day avg <strong>€{card.pricing.cardmarket.avg30.toFixed(2)}</strong></span>}
-                    {card.pricing.cardmarket.low != null && <span>Low <strong>€{card.pricing.cardmarket.low.toFixed(2)}</strong></span>}
-                    {card.pricing.cardmarket.trendHolo != null && <span>Holo trend <strong>€{card.pricing.cardmarket.trendHolo.toFixed(2)}</strong></span>}
+                    {card.pricing.cardmarket.trend != null && (
+                      <span>Trend <strong>€{card.pricing.cardmarket.trend.toFixed(2)}{toGbp(card.pricing.cardmarket.trend) && <> · {toGbp(card.pricing.cardmarket.trend)}</>}</strong></span>
+                    )}
+                    {card.pricing.cardmarket.avg30 != null && (
+                      <span>30-day avg <strong>€{card.pricing.cardmarket.avg30.toFixed(2)}{toGbp(card.pricing.cardmarket.avg30) && <> · {toGbp(card.pricing.cardmarket.avg30)}</>}</strong></span>
+                    )}
+                    {card.pricing.cardmarket.low != null && (
+                      <span>Low <strong>€{card.pricing.cardmarket.low.toFixed(2)}{toGbp(card.pricing.cardmarket.low) && <> · {toGbp(card.pricing.cardmarket.low)}</>}</strong></span>
+                    )}
+                    {card.pricing.cardmarket.trendHolo != null && (
+                      <span>Holo trend <strong>€{card.pricing.cardmarket.trendHolo.toFixed(2)}{toGbp(card.pricing.cardmarket.trendHolo) && <> · {toGbp(card.pricing.cardmarket.trendHolo)}</>}</strong></span>
+                    )}
                   </div>
                 </div>
               )}
@@ -170,5 +211,6 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
         </div>
       </div>
     </div>
+    </>
   );
 }

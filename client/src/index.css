@@ -954,7 +954,52 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 .admin-vis-btn:hover { background: var(--surface2); border-color: var(--yellow); }
 .admin-vis-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Pricing ── */
+/* ── Lightbox ── */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-img {
+  max-width: min(420px, 90vw);
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+  object-fit: contain;
+}
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: rgba(255,255,255,0.12);
+  border: none;
+  color: #fff;
+  font-size: 1.4rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.25); }
+
+.modal-card-thumb {
+  cursor: zoom-in;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border-radius: 6px;
+}
+.modal-card-thumb:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
 .pricing-section {
   background: var(--surface2);
   border-radius: 10px;
