@@ -58,18 +58,32 @@ export default async function handler(req, res) {
       if (!setsRes.ok) throw new Error(`Sets fetch failed: ${setsRes.status}`);
       const sets = await setsRes.json();
 
-      // Upsert basic set info
+      // Fetch existing set images from DB so we never overwrite custom ones
+      const existingImages = {};
+      {
+        let from = 0;
+        while (true) {
+          const { data: page } = await supabase.from('sets').select('id, logo_image, symbol_image').range(from, from + 999);
+          if (!page || page.length === 0) break;
+          page.forEach((s) => { existingImages[s.id] = s; });
+          if (page.length < 1000) break;
+          from += 1000;
+        }
+      }
+
+      // Upsert basic set info — never overwrite a field that already has a value in the DB
       for (let i = 0; i < sets.length; i += BATCH) {
         const rows = sets.slice(i, i + BATCH).map((s) => {
+          const existing = existingImages[s.id] ?? {};
           const row = {
             id: s.id,
             name: s.name,
             total: s.cardCount?.total ?? null,
             printed_total: s.cardCount?.official ?? null,
           };
-          // Only set images if TCGdex provides them — preserves any manually set values
-          if (s.symbol) row.symbol_image = `${s.symbol}.webp`;
-          if (s.logo) row.logo_image = `${s.logo}.webp`;
+          // Only set image fields if the DB doesn't already have a custom value
+          if (!existing.symbol_image && s.symbol) row.symbol_image = `${s.symbol}.webp`;
+          if (!existing.logo_image   && s.logo)   row.logo_image   = `${s.logo}.webp`;
           return row;
         });
         const { error } = await supabase.from('sets').upsert(rows, { onConflict: 'id' });
@@ -101,9 +115,9 @@ export default async function handler(req, res) {
             release_date: detail.releaseDate ?? null,
             total: detail.cardCount?.total ?? detail.cards?.length ?? null,
             printed_total: detail.cardCount?.official ?? null,
-            // Only overwrite images if TCGdex provides them — preserves manual overrides
-            ...(detail.symbol ? { symbol_image: `${detail.symbol}.webp` } : {}),
-            ...(detail.logo   ? { logo_image:   `${detail.logo}.webp`   } : {}),
+            // Only set image fields if the DB doesn't already have a custom value
+            ...(detail.symbol && !existingImages[detail.id]?.symbol_image ? { symbol_image: `${detail.symbol}.webp` } : {}),
+            ...(detail.logo   && !existingImages[detail.id]?.logo_image   ? { logo_image:   `${detail.logo}.webp`   } : {}),
           }).eq('id', detail.id);
           if (detail.cards) {
             detail.cards
