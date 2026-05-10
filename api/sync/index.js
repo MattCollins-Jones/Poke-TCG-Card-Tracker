@@ -37,15 +37,9 @@ async function fetchBatch(urls) {
   );
 }
 
-async function requireAdmin(req, res) {
-  // Allow cron jobs via secret header
-  const cronSecret = req.headers['x-sync-secret'];
-  if (cronSecret && cronSecret === process.env.SYNC_SECRET) return true;
-
-  // Otherwise require a logged-in admin user
+async function requireAdminUser(req, res) {
   const user = await getUser(req);
   if (!user) { res.status(401).json({ error: 'Unauthorised' }); return false; }
-
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail || user.email !== adminEmail) {
     res.status(403).json({ error: 'Forbidden — admin only' });
@@ -55,22 +49,77 @@ async function requireAdmin(req, res) {
 }
 
 export default async function handler(req, res) {
+  const supabase = createServiceClient();
+
+  // ── GET: return sync status & schedule config for the admin UI ──────────
+  if (req.method === 'GET') {
+    const ok = await requireAdminUser(req, res);
+    if (!ok) return;
+
+    const { data: rows } = await supabase.from('sync_meta').select('key, value');
+    const meta = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
+
+    return res.json({
+      lastSync:          meta.last_sync           ?? null,
+      lastSyncType:      meta.last_sync_type       ?? 'manual',
+      lastPriceSync:     meta.last_price_sync      ?? null,
+      lastPriceSyncType: meta.last_price_sync_type ?? 'manual',
+      scheduleType:      meta.schedule_type        ?? 'monthly',
+      scheduleDay:       parseInt(meta.schedule_day ?? '1', 10),
+    });
+  }
+
   if (req.method !== 'POST') return res.status(405).end();
 
-  const isAdmin = await requireAdmin(req, res);
-  if (!isAdmin) return;
+  // ── Determine caller: cron job (secret header) or logged-in admin ────────
+  const cronSecret = req.headers['x-sync-secret'];
+  const isScheduledRun = !!(cronSecret && cronSecret === process.env.SYNC_SECRET);
 
-  // phase=sets  → sync sets list + collect all card IDs, store pending IDs in sync_meta
-  // phase=cards → fetch next batch of pending card IDs from sync_meta, upsert, advance cursor
-  // phase=prices → fetch next batch of ALL card IDs and update pricing columns only
-  // phase=auto  → run sets phase then as many card batches as time allows (default)
+  if (isScheduledRun) {
+    // Cron path: check whether today matches the configured schedule
+    const { data: schedRows } = await supabase.from('sync_meta').select('key, value')
+      .in('key', ['schedule_type', 'schedule_day']);
+    const schedMeta = Object.fromEntries((schedRows ?? []).map((r) => [r.key, r.value]));
+    const scheduleType = schedMeta.schedule_type ?? 'monthly';
+    const scheduleDay  = parseInt(schedMeta.schedule_day ?? '1', 10);
+
+    const now = new Date();
+    let shouldRun = false;
+    if (scheduleType === 'weekly')       shouldRun = now.getUTCDay()  === scheduleDay;
+    else if (scheduleType === 'monthly') shouldRun = now.getUTCDate() === scheduleDay;
+    // 'manual_only' → never auto-run
+
+    if (!shouldRun) {
+      res.setHeader('Content-Type', 'text/plain');
+      res.write('Scheduled check — not sync day. Skipping.\n');
+      return res.end();
+    }
+  } else {
+    // Manual path: require a logged-in admin user
+    const ok = await requireAdminUser(req, res);
+    if (!ok) return;
+  }
+
+  // phase=sets     → sync sets list + collect all card IDs, store pending IDs in sync_meta
+  // phase=cards    → fetch next batch of pending card IDs from sync_meta, upsert, advance cursor
+  // phase=prices   → fetch next batch of ALL card IDs and update pricing columns only
+  // phase=auto     → run sets phase then as many card batches as time allows (default)
+  // phase=schedule → save schedule config (scheduleType, scheduleDay)
   const phase = req.query.phase ?? 'auto';
   const CARD_BATCH_SIZE = 1000; // cards per invocation
 
+  // ── Schedule config save ─────────────────────────────────────────────────
+  if (phase === 'schedule') {
+    const { scheduleType, scheduleDay } = req.body ?? {};
+    await supabase.from('sync_meta').upsert([
+      { key: 'schedule_type', value: scheduleType ?? 'monthly' },
+      { key: 'schedule_day',  value: String(scheduleDay ?? 1)  },
+    ], { onConflict: 'key' });
+    return res.json({ ok: true });
+  }
+
   res.setHeader('Content-Type', 'text/plain');
   const log = (msg) => { console.log('[sync]', msg); try { res.write(msg + '\n'); } catch {} };
-
-  const supabase = createServiceClient();
 
   try {
     if (phase === 'sets' || phase === 'auto') {
@@ -224,8 +273,9 @@ export default async function handler(req, res) {
         // All done — clear pending list
         await supabase.from('sync_meta').upsert([
           { key: 'pending_card_ids', value: '[]' },
-          { key: 'card_cursor', value: '0' },
-          { key: 'last_sync', value: new Date().toISOString() },
+          { key: 'card_cursor',      value: '0' },
+          { key: 'last_sync',        value: new Date().toISOString() },
+          { key: 'last_sync_type',   value: isScheduledRun ? 'scheduled' : 'manual' },
         ], { onConflict: 'key' });
         log(`All cards synced! Total: ${pendingCardIds.length} cards processed.`);
       } else {
@@ -304,8 +354,9 @@ export default async function handler(req, res) {
 
       if (remaining <= 0) {
         await supabase.from('sync_meta').upsert([
-          { key: 'price_cursor', value: '0' },
-          { key: 'last_price_sync', value: new Date().toISOString() },
+          { key: 'price_cursor',          value: '0' },
+          { key: 'last_price_sync',       value: new Date().toISOString() },
+          { key: 'last_price_sync_type',  value: isScheduledRun ? 'scheduled' : 'manual' },
         ], { onConflict: 'key' });
         log(`Price sync complete! Updated prices for ${allIds.length} cards.`);
       } else {
