@@ -141,9 +141,23 @@ export default async function handler(req, res) {
             ...(detail.logo   && !existingImages[detail.id]?.logo_image   ? { logo_image:   `${detail.logo}.webp`   } : {}),
           }).eq('id', detail.id);
           if (detail.cards) {
-            detail.cards
-              .filter((c) => !existingIds.has(c.id))
-              .forEach((c) => pendingCardIds.push(c.id));
+            const newCards = detail.cards.filter((c) => !existingIds.has(c.id));
+            if (newCards.length > 0) {
+              // Insert minimal stub rows immediately so that cards which fail the
+              // individual fetch (TCGdex data gaps) are still recorded in the DB
+              // and won't be re-queued on every subsequent sync.
+              const stubs = newCards.map((c) => ({
+                id: c.id,
+                set_id: detail.id,
+                name: c.name ?? null,
+                number: c.localId ?? null,
+              }));
+              await supabase.from('cards').upsert(stubs, { onConflict: 'id', ignoreDuplicates: true });
+              newCards.forEach((c) => {
+                existingIds.add(c.id); // prevent duplicate queuing within this run
+                pendingCardIds.push(c.id);
+              });
+            }
           }
         }
         await sleep(80);
