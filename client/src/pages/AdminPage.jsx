@@ -65,34 +65,34 @@ function AddSetForm({ onAdded }) {
         <form className="admin-add-form" onSubmit={handleSubmit}>
           <div className="admin-add-grid">
             <label>
-              Set ID <span className="admin-required">*</span>
+              <span className="admin-field-label">Set ID <span className="admin-required">*</span></span>
               <input className="admin-input" value={form.id} onChange={e => setField('id', e.target.value)} placeholder="e.g. custom-promos-2024" required />
               <span className="admin-hint">Lowercase slug, must be unique</span>
             </label>
             <label>
-              Name <span className="admin-required">*</span>
+              <span className="admin-field-label">Name <span className="admin-required">*</span></span>
               <input className="admin-input" value={form.name} onChange={e => setField('name', e.target.value)} placeholder="Set name" required />
             </label>
             <label>
-              Series
+              <span className="admin-field-label">Series</span>
               <input className="admin-input" value={form.series} onChange={e => setField('series', e.target.value)} placeholder="e.g. Scarlet & Violet" />
             </label>
             <label>
-              Release Date
+              <span className="admin-field-label">Release Date</span>
               <input className="admin-input" type="date" value={form.release_date} onChange={e => setField('release_date', e.target.value)} />
             </label>
             <label>
-              Total Cards
+              <span className="admin-field-label">Total Cards</span>
               <input className="admin-input" type="number" min="0" value={form.total} onChange={e => setField('total', e.target.value)} placeholder="0" />
             </label>
           </div>
           <div className="admin-add-images">
             <label>
-              Logo Image
+              <span className="admin-field-label">Logo Image</span>
               <ImageUpload value={form.logo_image} onChange={v => setField('logo_image', v)} folder="sets/logos" showPreview />
             </label>
             <label>
-              Symbol Image
+              <span className="admin-field-label">Symbol Image</span>
               <ImageUpload value={form.symbol_image} onChange={v => setField('symbol_image', v)} folder="sets/symbols" showPreview />
             </label>
           </div>
@@ -167,18 +167,18 @@ function AddCardForm({ sets, defaultSetId, onAdded }) {
         <form className="admin-add-form" onSubmit={handleSubmit}>
           <div className="admin-add-grid">
             <label>
-              Set <span className="admin-required">*</span>
+              <span className="admin-field-label">Set <span className="admin-required">*</span></span>
               <select className="admin-input" value={form.set_id} onChange={e => setField('set_id', e.target.value)} required>
                 <option value="">— Select set —</option>
                 {sets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </label>
             <label>
-              Card Number
+              <span className="admin-field-label">Card Number</span>
               <input className="admin-input" value={form.number} onChange={e => setField('number', e.target.value)} placeholder="e.g. 001 or SV01" />
             </label>
             <label>
-              Card ID <span className="admin-required">*</span>
+              <span className="admin-field-label">Card ID <span className="admin-required">*</span></span>
               <input
                 className="admin-input"
                 value={form.id}
@@ -189,21 +189,21 @@ function AddCardForm({ sets, defaultSetId, onAdded }) {
               <span className="admin-hint">Auto-filled from Set + Number</span>
             </label>
             <label>
-              Name <span className="admin-required">*</span>
+              <span className="admin-field-label">Name <span className="admin-required">*</span></span>
               <input className="admin-input" value={form.name} onChange={e => setField('name', e.target.value)} placeholder="Card name" required />
             </label>
             <label>
-              Rarity
+              <span className="admin-field-label">Rarity</span>
               <input className="admin-input" value={form.rarity} onChange={e => setField('rarity', e.target.value)} placeholder="e.g. Rare Holo" />
             </label>
           </div>
           <div className="admin-add-images">
             <label>
-              Card Image (small)
+              <span className="admin-field-label">Card Image (small)</span>
               <ImageUpload value={form.small_image} onChange={v => setField('small_image', v)} folder="cards/small" showPreview />
             </label>
             <label>
-              Card Image (large)
+              <span className="admin-field-label">Card Image (large)</span>
               <ImageUpload value={form.large_image} onChange={v => setField('large_image', v)} folder="cards/large" showPreview />
             </label>
           </div>
@@ -484,12 +484,7 @@ function CardsAdmin() {
 
   return (
     <div>
-      <AddCardForm
-        sets={sets}
-        defaultSetId={selectedSet}
-        onAdded={(setId) => { if (setId === selectedSet) loadCards(setId); }}
-      />
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <select
           className="filter-select"
           value={selectedSet}
@@ -515,6 +510,12 @@ function CardsAdmin() {
           </label>
         )}
       </div>
+
+      <AddCardForm
+        sets={sets}
+        defaultSetId={selectedSet}
+        onAdded={(setId) => { if (setId === selectedSet) loadCards(setId); }}
+      />
 
       {loadingCards && <div className="loading">Loading cards…</div>}
 
