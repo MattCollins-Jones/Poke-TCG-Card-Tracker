@@ -78,6 +78,34 @@ body {
 }
 .currency-select:hover, .currency-select:focus { border-color: var(--yellow); }
 
+/* ── Admin add forms ── */
+.admin-add-section { margin-bottom: 8px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.admin-add-toggle {
+  width: 100%; text-align: left; background: var(--card-bg); color: var(--text);
+  border: none; padding: 10px 16px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+}
+.admin-add-toggle:hover { background: var(--surface); }
+.admin-add-form { padding: 16px; background: var(--surface); border-top: 1px solid var(--border); }
+.admin-add-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.admin-add-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--text-muted); }
+.admin-add-images { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.admin-add-images label { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: var(--text-muted); }
+.admin-add-actions { display: flex; gap: 8px; }
+.admin-required { color: #f66; }
+.admin-hint { font-size: 0.72rem; color: var(--text-muted); opacity: 0.7; }
+
+/* ── ImageUpload component ── */
+.image-upload-field { display: flex; flex-direction: column; gap: 4px; }
+.image-upload-row { display: flex; gap: 4px; align-items: center; }
+.admin-upload-btn {
+  flex-shrink: 0; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 9px; font-size: 1rem; cursor: pointer; line-height: 1;
+}
+.admin-upload-btn:hover:not(:disabled) { border-color: var(--yellow); }
+.admin-upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin-upload-preview { width: 60px; height: auto; border-radius: 4px; border: 1px solid var(--border); margin-top: 4px; object-fit: contain; }
+
 /* ── Page headers ── */
 h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 20px; }
 h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }

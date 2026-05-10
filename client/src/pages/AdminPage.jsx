@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/apiFetch.js';
+import ImageUpload from '../components/ImageUpload.jsx';
 
 // ── Shared toggle helper ──────────────────────────────────────────────────────
 
@@ -20,6 +21,207 @@ async function toggleHidden(endpoint, id, currentHidden, setItems, setToggling) 
   setToggling(prev => ({ ...prev, [id]: false }));
 }
 
+const EMPTY_SET = { id: '', name: '', series: '', release_date: '', total: '', logo_image: '', symbol_image: '' };
+const EMPTY_CARD = { id: '', name: '', number: '', rarity: '', small_image: '', large_image: '' };
+
+// ── Add Set Form ──────────────────────────────────────────────────────────────
+
+function AddSetForm({ onAdded }) {
+  const [form, setForm] = useState(EMPTY_SET);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.id || !form.name) { setError('ID and Name are required'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await apiFetch('/api/admin/sets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setForm(EMPTY_SET);
+      setOpen(false);
+      onAdded();
+    } catch (err) {
+      setError(err.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="admin-add-section">
+      <button className="admin-add-toggle" onClick={() => setOpen(o => !o)}>
+        {open ? '▾' : '▸'} Add New Set
+      </button>
+      {open && (
+        <form className="admin-add-form" onSubmit={handleSubmit}>
+          <div className="admin-add-grid">
+            <label>
+              Set ID <span className="admin-required">*</span>
+              <input className="admin-input" value={form.id} onChange={e => setField('id', e.target.value)} placeholder="e.g. custom-promos-2024" required />
+              <span className="admin-hint">Lowercase slug, must be unique</span>
+            </label>
+            <label>
+              Name <span className="admin-required">*</span>
+              <input className="admin-input" value={form.name} onChange={e => setField('name', e.target.value)} placeholder="Set name" required />
+            </label>
+            <label>
+              Series
+              <input className="admin-input" value={form.series} onChange={e => setField('series', e.target.value)} placeholder="e.g. Scarlet & Violet" />
+            </label>
+            <label>
+              Release Date
+              <input className="admin-input" type="date" value={form.release_date} onChange={e => setField('release_date', e.target.value)} />
+            </label>
+            <label>
+              Total Cards
+              <input className="admin-input" type="number" min="0" value={form.total} onChange={e => setField('total', e.target.value)} placeholder="0" />
+            </label>
+          </div>
+          <div className="admin-add-images">
+            <label>
+              Logo Image
+              <ImageUpload value={form.logo_image} onChange={v => setField('logo_image', v)} folder="sets/logos" showPreview />
+            </label>
+            <label>
+              Symbol Image
+              <ImageUpload value={form.symbol_image} onChange={v => setField('symbol_image', v)} folder="sets/symbols" showPreview />
+            </label>
+          </div>
+          {error && <div className="admin-err">{error}</div>}
+          <div className="admin-add-actions">
+            <button type="submit" className="btn-primary admin-save-btn" disabled={saving}>
+              {saving ? 'Adding…' : '+ Add Set'}
+            </button>
+            <button type="button" className="btn-secondary admin-save-btn" onClick={() => { setOpen(false); setForm(EMPTY_SET); setError(''); }}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ── Add Card Form ─────────────────────────────────────────────────────────────
+
+function AddCardForm({ sets, defaultSetId, onAdded }) {
+  const [form, setForm] = useState({ ...EMPTY_CARD, set_id: defaultSetId ?? '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (defaultSetId) setForm(prev => ({ ...prev, set_id: defaultSetId }));
+  }, [defaultSetId]);
+
+  const setField = (field, value) => {
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      // Auto-suggest card ID when set or number changes
+      if (field === 'set_id' || field === 'number') {
+        const sid = field === 'set_id' ? value : next.set_id;
+        const num = field === 'number' ? value : next.number;
+        if (sid && num && !next._idManual) next.id = `${sid}-${num.replace(/\s+/g, '-')}`;
+      }
+      return next;
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.id || !form.set_id || !form.name) { setError('ID, Set, and Name are required'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await apiFetch('/api/admin/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setForm({ ...EMPTY_CARD, set_id: form.set_id });
+      setOpen(false);
+      onAdded(form.set_id);
+    } catch (err) {
+      setError(err.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="admin-add-section">
+      <button className="admin-add-toggle" onClick={() => setOpen(o => !o)}>
+        {open ? '▾' : '▸'} Add New Card
+      </button>
+      {open && (
+        <form className="admin-add-form" onSubmit={handleSubmit}>
+          <div className="admin-add-grid">
+            <label>
+              Set <span className="admin-required">*</span>
+              <select className="admin-input" value={form.set_id} onChange={e => setField('set_id', e.target.value)} required>
+                <option value="">— Select set —</option>
+                {sets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Card Number
+              <input className="admin-input" value={form.number} onChange={e => setField('number', e.target.value)} placeholder="e.g. 001 or SV01" />
+            </label>
+            <label>
+              Card ID <span className="admin-required">*</span>
+              <input
+                className="admin-input"
+                value={form.id}
+                onChange={e => setForm(prev => ({ ...prev, id: e.target.value, _idManual: true }))}
+                placeholder="e.g. custom-set-001"
+                required
+              />
+              <span className="admin-hint">Auto-filled from Set + Number</span>
+            </label>
+            <label>
+              Name <span className="admin-required">*</span>
+              <input className="admin-input" value={form.name} onChange={e => setField('name', e.target.value)} placeholder="Card name" required />
+            </label>
+            <label>
+              Rarity
+              <input className="admin-input" value={form.rarity} onChange={e => setField('rarity', e.target.value)} placeholder="e.g. Rare Holo" />
+            </label>
+          </div>
+          <div className="admin-add-images">
+            <label>
+              Card Image (small)
+              <ImageUpload value={form.small_image} onChange={v => setField('small_image', v)} folder="cards/small" showPreview />
+            </label>
+            <label>
+              Card Image (large)
+              <ImageUpload value={form.large_image} onChange={v => setField('large_image', v)} folder="cards/large" showPreview />
+            </label>
+          </div>
+          {error && <div className="admin-err">{error}</div>}
+          <div className="admin-add-actions">
+            <button type="submit" className="btn-primary admin-save-btn" disabled={saving}>
+              {saving ? 'Adding…' : '+ Add Card'}
+            </button>
+            <button type="button" className="btn-secondary admin-save-btn" onClick={() => { setOpen(false); setForm({ ...EMPTY_CARD, set_id: form.set_id }); setError(''); }}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 // ── Sets Admin Tab ────────────────────────────────────────────────────────────
 
 function SetsAdmin() {
@@ -32,12 +234,15 @@ function SetsAdmin() {
   const [edits, setEdits] = useState({});
   const [feedback, setFeedback] = useState({});
 
-  useEffect(() => {
+  const loadSets = () => {
+    setLoading(true);
     apiFetch('/api/admin/sets').then(r => r.json()).then(d => {
       setSets(d.data ?? []);
       setLoading(false);
     });
-  }, []);
+  };
+
+  useEffect(() => { loadSets(); }, []);
 
   const filtered = sets.filter(s => {
     if (!showHidden && s.hidden) return false;
@@ -92,7 +297,8 @@ function SetsAdmin() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      <AddSetForm onAdded={loadSets} />
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}>
         <input
           className="search-input"
           placeholder="Search sets…"
@@ -116,8 +322,8 @@ function SetsAdmin() {
               <th>ID</th>
               <th>Name</th>
               <th>Series</th>
-              <th>Logo URL</th>
-              <th>Symbol URL</th>
+              <th>Logo</th>
+              <th>Symbol</th>
               <th></th>
             </tr>
           </thead>
@@ -147,19 +353,17 @@ function SetsAdmin() {
                   />
                 </td>
                 <td>
-                  <input
-                    className="admin-input admin-url-input"
+                  <ImageUpload
                     value={getEdit(set.id, 'logo_image', set.images?.logo ?? '')}
-                    onChange={e => setEdit(set.id, 'logo_image', e.target.value)}
-                    placeholder="https://…"
+                    onChange={v => setEdit(set.id, 'logo_image', v)}
+                    folder="sets/logos"
                   />
                 </td>
                 <td>
-                  <input
-                    className="admin-input admin-url-input"
+                  <ImageUpload
                     value={getEdit(set.id, 'symbol_image', set.images?.symbol ?? '')}
-                    onChange={e => setEdit(set.id, 'symbol_image', e.target.value)}
-                    placeholder="https://…"
+                    onChange={v => setEdit(set.id, 'symbol_image', v)}
+                    folder="sets/symbols"
                   />
                 </td>
                 <td className="admin-actions">
@@ -215,16 +419,18 @@ function CardsAdmin() {
     apiFetch('/api/admin/sets').then(r => r.json()).then(d => setSets(d.data ?? []));
   }, []);
 
-  useEffect(() => {
-    if (!selectedSet) { setCards([]); return; }
+  const loadCards = (setId) => {
+    if (!setId) { setCards([]); return; }
     setLoadingCards(true);
     setCards([]);
     setEdits({});
-    apiFetch(`/api/admin/cards?setId=${selectedSet}`)
+    apiFetch(`/api/admin/cards?setId=${setId}`)
       .then(r => r.json())
       .then(d => { setCards(d.data ?? []); setLoadingCards(false); })
       .catch(() => setLoadingCards(false));
-  }, [selectedSet]);
+  };
+
+  useEffect(() => { loadCards(selectedSet); }, [selectedSet]);
 
   const filtered = cards.filter(c => {
     if (!showHidden && c.hidden) return false;
@@ -278,7 +484,12 @@ function CardsAdmin() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      <AddCardForm
+        sets={sets}
+        defaultSetId={selectedSet}
+        onAdded={(setId) => { if (setId === selectedSet) loadCards(setId); }}
+      />
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}>
         <select
           className="filter-select"
           value={selectedSet}
@@ -324,7 +535,7 @@ function CardsAdmin() {
                   <th>#</th>
                   <th>Name</th>
                   <th>Rarity</th>
-                  <th>Small image URL</th>
+                  <th>Card Image</th>
                   <th></th>
                 </tr>
               </thead>
@@ -352,11 +563,10 @@ function CardsAdmin() {
                       />
                     </td>
                     <td>
-                      <input
-                        className="admin-input admin-url-input"
+                      <ImageUpload
                         value={getEdit(card.id, 'small_image', card.images?.small ?? '')}
-                        onChange={e => setEdit(card.id, 'small_image', e.target.value)}
-                        placeholder="https://…"
+                        onChange={v => setEdit(card.id, 'small_image', v)}
+                        folder="cards/small"
                       />
                     </td>
                     <td className="admin-actions">
