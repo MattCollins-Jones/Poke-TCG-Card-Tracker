@@ -5,11 +5,32 @@ const BATCH = 20;
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function fetchWithRetry(url, retries = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 7000); // 7 s per attempt
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt < retries) await sleep(800 * attempt);
+    }
+  }
+  // Surface the root cause (Node 18 native fetch wraps it in err.cause)
+  const cause = lastErr?.cause;
+  const detail = cause?.message ?? cause?.code ?? lastErr?.message ?? 'fetch failed';
+  throw new Error(`fetch failed after ${retries} attempts: ${detail}`);
+}
+
 async function fetchBatch(urls) {
   return Promise.all(
     urls.map(async (url) => {
       try {
-        const res = await fetch(url);
+        const res = await fetchWithRetry(url, 2);
         return res.ok ? res.json() : null;
       } catch { return null; }
     })
@@ -54,7 +75,7 @@ export default async function handler(req, res) {
   try {
     if (phase === 'sets' || phase === 'auto') {
       log('Fetching sets list…');
-      const setsRes = await fetch(`${API}/sets`);
+      const setsRes = await fetchWithRetry(`${API}/sets`);
       if (!setsRes.ok) throw new Error(`Sets fetch failed: ${setsRes.status}`);
       const sets = await setsRes.json();
 
@@ -285,7 +306,9 @@ export default async function handler(req, res) {
     }
 
   } catch (err) {
-    log(`Error: ${err.message}`);
+    const cause = err?.cause;
+    const detail = cause?.message ?? cause?.code ?? err.message ?? 'unknown error';
+    log(`Error: ${detail}`);
     res.end();
   }
 }
