@@ -210,6 +210,20 @@ export default function CardsPage() {
     await loadCollection();
   };
 
+  const handleAdjust = async (entry, delta) => {
+    const newQty = entry.quantity + delta;
+    if (newQty <= 0) {
+      await apiFetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
+    } else {
+      await apiFetch(`/api/collection/${entry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: newQty, condition: entry.condition, wishlist: entry.wishlist, notes: entry.notes }),
+      });
+    }
+    await loadCollection();
+  };
+
   if (loading) return <div className="loading">Loading cards…</div>;
   if (loadError) return (
     <div style={{ padding: 32 }}>
@@ -440,6 +454,7 @@ export default function CardsPage() {
           onClose={() => setSelectedCard(null)}
           onSave={handleSave}
           onDelete={handleDelete}
+          onAdjust={handleAdjust}
         />
       )}
     </div>

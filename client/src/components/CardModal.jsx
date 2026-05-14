@@ -1,68 +1,28 @@
 import { useState, useEffect } from 'react';
-import { getAvailableFinishes, FINISH_LABELS } from '../utils/finishes.js';
+import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from '../utils/finishes.js';
 import { useCurrency } from '../context/CurrencyContext.jsx';
 
 const CONDITIONS = ['mint', 'good', 'played', 'poor'];
 
-export default function CardModal({ card, collectionEntries = [], setName, initialFinish, onClose, onSave, onDelete }) {
+export default function CardModal({ card, collectionEntries = [], setName, initialFinish, onClose, onSave, onDelete, onAdjust }) {
   const availableFinishes = getAvailableFinishes(card.variants);
   const ownedEntries = collectionEntries.filter((e) => !e.wishlist);
-  const firstOwned = ownedEntries[0] ?? null;
 
-  const defaultFinish = initialFinish ?? firstOwned?.finish ?? availableFinishes[0];
-  const [finish, setFinish] = useState(availableFinishes.includes(defaultFinish) ? defaultFinish : availableFinishes[0]);
-  const [quantity, setQuantity] = useState(firstOwned?.finish === finish ? (firstOwned?.quantity ?? 1) : 1);
-  const [condition, setCondition] = useState(firstOwned?.finish === finish ? (firstOwned?.condition ?? 'mint') : 'mint');
-  const [wishlist, setWishlist] = useState(!firstOwned && collectionEntries.some((e) => e.wishlist));
-  const [notes, setNotes] = useState(firstOwned?.finish === finish ? (firstOwned?.notes ?? '') : '');
+  // Which finish row is expanded for editing vs adding
+  const [editingFinish, setEditingFinish] = useState(null);
+  const [editCondition, setEditCondition] = useState('mint');
+  const [editNotes, setEditNotes] = useState('');
+
+  const [addingFinish, setAddingFinish] = useState(null);
+  const [addQty, setAddQty] = useState(1);
+  const [addCondition, setAddCondition] = useState('mint');
+  const [addNotes, setAddNotes] = useState('');
+  const [addWishlist, setAddWishlist] = useState(false);
+
   const [saving, setSaving] = useState(false);
+  const [adjusting, setAdjusting] = useState(new Set());
   const { convertEur, convertUsd, fmt } = useCurrency();
   const [lightbox, setLightbox] = useState(false);
-
-  // When finish changes, load the matching entry's data
-  useEffect(() => {
-    const match = ownedEntries.find((e) => e.finish === finish) ?? null;
-    if (match) {
-      setQuantity(match.quantity);
-      setCondition(match.condition);
-      setNotes(match.notes ?? '');
-      setWishlist(false);
-    } else {
-      setQuantity(1);
-      setCondition('mint');
-      setNotes('');
-    }
-  }, [finish]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const matchingEntry = collectionEntries.find((e) => e.finish === finish && !e.wishlist);
-
-  const handleSave = async () => {
-    setSaving(true);
-    await onSave({
-      card_id: card.id,
-      set_id: card.set.id,
-      card_name: card.name,
-      set_name: setName ?? card.set?.name ?? card.set?.id ?? '',
-      card_number: card.number,
-      card_image: card.images?.small,
-      rarity: card.rarity,
-      finish,
-      quantity: parseInt(quantity, 10),
-      condition,
-      wishlist,
-      notes,
-    });
-    setSaving(false);
-    onClose();
-  };
-
-  const handleDelete = async () => {
-    if (!matchingEntry) return;
-    setSaving(true);
-    await onDelete(matchingEntry.id);
-    setSaving(false);
-    onClose();
-  };
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -70,7 +30,62 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const finishSummary = ownedEntries.map((e) => `${e.finish} ×${e.quantity}`).join(', ');
+  const handleAdjust = async (entry, delta) => {
+    setAdjusting((s) => new Set(s).add(entry.id));
+    await onAdjust(entry, delta);
+    setAdjusting((s) => { const n = new Set(s); n.delete(entry.id); return n; });
+  };
+
+  const startEditing = (entry) => {
+    if (editingFinish === entry.finish) { setEditingFinish(null); return; }
+    setAddingFinish(null);
+    setEditingFinish(entry.finish);
+    setEditCondition(entry.condition ?? 'mint');
+    setEditNotes(entry.notes ?? '');
+  };
+
+  const handleSaveEdit = async (entry) => {
+    setSaving(true);
+    await onSave({
+      card_id: card.id, set_id: card.set.id, card_name: card.name,
+      set_name: setName ?? card.set?.name ?? card.set?.id ?? '',
+      card_number: card.number, card_image: card.images?.small, rarity: card.rarity,
+      finish: entry.finish, quantity: entry.quantity,
+      condition: editCondition, wishlist: false, notes: editNotes,
+    });
+    setSaving(false);
+    setEditingFinish(null);
+  };
+
+  const handleRemove = async (entry) => {
+    setSaving(true);
+    await onDelete(entry.id);
+    setSaving(false);
+    setEditingFinish(null);
+  };
+
+  const startAdding = (f) => {
+    if (addingFinish === f) { setAddingFinish(null); return; }
+    setEditingFinish(null);
+    setAddingFinish(f);
+    setAddQty(1);
+    setAddCondition('mint');
+    setAddNotes('');
+    setAddWishlist(false);
+  };
+
+  const handleAddFinish = async () => {
+    setSaving(true);
+    await onSave({
+      card_id: card.id, set_id: card.set.id, card_name: card.name,
+      set_name: setName ?? card.set?.name ?? card.set?.id ?? '',
+      card_number: card.number, card_image: card.images?.small, rarity: card.rarity,
+      finish: addingFinish, quantity: parseInt(addQty, 10),
+      condition: addCondition, wishlist: addWishlist, notes: addNotes,
+    });
+    setSaving(false);
+    setAddingFinish(null);
+  };
 
   return (
     <>
@@ -103,7 +118,6 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
             <div className="meta">#{card.number} · {setName ?? card.set?.name}</div>
             {card.rarity && <div className="meta rarity-text">{card.rarity}</div>}
             {card.subtypes?.length > 0 && <div className="meta">{card.subtypes.join(', ')}</div>}
-            {finishSummary && <div className="meta owned-summary">Owned: {finishSummary}</div>}
           </div>
         </div>
 
@@ -147,58 +161,112 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
           </div>
         )}
 
-        <div className="form-group">
-          <label>Finish</label>
-          {availableFinishes.length === 1 ? (
-            <div className="single-finish">{FINISH_LABELS[availableFinishes[0]]}</div>
-          ) : (
-            <div className="finish-selector">
-              {availableFinishes.map((f) => (
-                <button
-                  key={f}
-                  className={`finish-btn${finish === f ? ' active' : ''}${ownedEntries.some((e) => e.finish === f) ? ' has-entry' : ''}`}
-                  onClick={() => setFinish(f)}
-                >
-                  {FINISH_LABELS[f]}
-                  {ownedEntries.some((e) => e.finish === f) && <span className="finish-dot">●</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Per-finish collection management */}
+        <div className="finish-list">
+          <div className="finish-list-title">Collection</div>
+          {availableFinishes.map((f) => {
+            const entry = ownedEntries.find((e) => e.finish === f) ?? null;
+            const wishlistEntry = collectionEntries.find((e) => e.finish === f && e.wishlist) ?? null;
+            const isEditing = editingFinish === f;
+            const isAdding = addingFinish === f;
+            const isAdjusting = entry && adjusting.has(entry.id);
 
-        <div className="form-group">
-          <label>Quantity</label>
-          <input type="number" className="form-control" min="0" max="99" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-        </div>
+            return (
+              <div key={f} className={`finish-row${entry ? ' finish-row-owned' : ''}${(isEditing || isAdding) ? ' finish-row-expanded' : ''}`}>
+                <div className="finish-row-main">
+                  <span className={`fhp-label fhp-label-${f.replace(' ', '-')}`}>
+                    {FINISH_LABELS_SHORT[f] ?? f}
+                  </span>
+                  <span className="finish-row-name">{FINISH_LABELS[f]}</span>
 
-        <div className="form-group">
-          <label>Condition</label>
-          <select className="form-control" value={condition} onChange={(e) => setCondition(e.target.value)}>
-            {CONDITIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-          </select>
-        </div>
+                  {entry ? (
+                    <>
+                      <div className="finish-row-qty">
+                        <button className="qty-btn" onClick={() => handleAdjust(entry, -1)} disabled={isAdjusting}>−</button>
+                        <span className="qty-value">×{entry.quantity}</span>
+                        <button className="qty-btn" onClick={() => handleAdjust(entry, +1)} disabled={isAdjusting}>+</button>
+                      </div>
+                      <span className="finish-row-condition">{entry.condition}</span>
+                      <button
+                        className={`finish-row-edit-btn${isEditing ? ' active' : ''}`}
+                        onClick={() => startEditing(entry)}
+                        title="Edit condition & notes"
+                      >⋯</button>
+                    </>
+                  ) : (
+                    <button
+                      className={`finish-row-add-btn${isAdding ? ' active' : ''}`}
+                      onClick={() => startAdding(f)}
+                    >
+                      {isAdding ? '✕ Cancel' : '+ Add'}
+                    </button>
+                  )}
+                  {wishlistEntry && !entry && (
+                    <span className="finish-row-wishlist" title="On wishlist">★</span>
+                  )}
+                </div>
 
-        <div className="form-group">
-          <label className="checkbox-row">
-            <input type="checkbox" checked={wishlist} onChange={(e) => setWishlist(e.target.checked)} />
-            Add to Wishlist
-          </label>
-        </div>
+                {/* Inline edit form (condition/notes) */}
+                {isEditing && entry && (
+                  <div className="finish-inline-form">
+                    <div className="finish-inline-row">
+                      <label>Condition</label>
+                      <select className="form-control form-control-sm" value={editCondition} onChange={(e) => setEditCondition(e.target.value)}>
+                        {CONDITIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                      </select>
+                    </div>
+                    <div className="finish-inline-row">
+                      <label>Notes</label>
+                      <input type="text" className="form-control form-control-sm" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Optional notes…" />
+                    </div>
+                    <div className="finish-inline-actions">
+                      <button className="btn btn-danger btn-sm" onClick={() => handleRemove(entry)} disabled={saving}>Remove</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingFinish(null)}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => handleSaveEdit(entry)} disabled={saving}>
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-        <div className="form-group">
-          <label>Notes</label>
-          <input type="text" className="form-control" placeholder="Optional notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+                {/* Inline add form for a new finish */}
+                {isAdding && (
+                  <div className="finish-inline-form">
+                    <div className="finish-inline-row">
+                      <label>Quantity</label>
+                      <input type="number" className="form-control form-control-sm" min="1" max="99" value={addQty} onChange={(e) => setAddQty(e.target.value)} />
+                    </div>
+                    <div className="finish-inline-row">
+                      <label>Condition</label>
+                      <select className="form-control form-control-sm" value={addCondition} onChange={(e) => setAddCondition(e.target.value)}>
+                        {CONDITIONS.map((c) => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                      </select>
+                    </div>
+                    <div className="finish-inline-row">
+                      <label className="checkbox-row">
+                        <input type="checkbox" checked={addWishlist} onChange={(e) => setAddWishlist(e.target.checked)} />
+                        Add to Wishlist instead
+                      </label>
+                    </div>
+                    <div className="finish-inline-row">
+                      <label>Notes</label>
+                      <input type="text" className="form-control form-control-sm" value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Optional notes…" />
+                    </div>
+                    <div className="finish-inline-actions">
+                      <button className="btn btn-ghost btn-sm" onClick={() => setAddingFinish(null)}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" onClick={handleAddFinish} disabled={saving}>
+                        {saving ? 'Saving…' : 'Add'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="modal-actions">
-          {matchingEntry && (
-            <button className="btn btn-danger" onClick={handleDelete} disabled={saving}>Remove {finish}</button>
-          )}
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>

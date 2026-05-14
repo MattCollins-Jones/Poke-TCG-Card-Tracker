@@ -648,7 +648,147 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 .finish-label-reverse-holo { background: #1d4ed8; color: #fff; }
 .finish-label-holo         { background: #f59e0b; color: #000; }
 
-.single-finish {
+/* ── Finish list in modal ── */
+.finish-list { margin-bottom: 16px; }
+.finish-list-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.finish-row {
+  border: 1px solid var(--surface2);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.finish-row-owned { border-color: rgba(76,175,80,0.35); }
+.finish-row-expanded { border-color: var(--yellow); }
+
+.finish-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  min-height: 46px;
+}
+.finish-row-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  flex: 1;
+}
+.finish-row-qty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.finish-row-condition {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+  min-width: 36px;
+  text-align: right;
+}
+.finish-row-edit-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--surface2);
+  color: var(--text-muted);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.finish-row-edit-btn:hover,
+.finish-row-edit-btn.active { background: var(--surface2); color: var(--yellow); }
+
+.finish-row-add-btn {
+  background: transparent;
+  border: 1px dashed var(--surface2);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.finish-row-add-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+.finish-row-add-btn.active { border-color: var(--yellow); color: var(--yellow); border-style: solid; }
+
+.finish-row-wishlist {
+  color: #ff9800;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* Inline expand form inside a finish row */
+.finish-inline-form {
+  padding: 10px 12px 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--surface2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.finish-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.finish-inline-row label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 72px;
+  flex-shrink: 0;
+}
+.finish-inline-row .form-control-sm,
+.finish-inline-row .checkbox-row { flex: 1; }
+.finish-inline-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+.form-control-sm {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--surface2);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  outline: none;
+}
+.form-control-sm:focus { border-color: var(--yellow); }
+.btn-sm { padding: 6px 14px; font-size: 0.82rem; }
+
+/* ── Mobile: always-show quick-add, hide hover panel ── */
+@media (hover: none) and (pointer: coarse) {
+  /* Always show the quick-add button on unowned cards */
+  .quick-add-btn { opacity: 1; }
+  /* Hide the hover panel — the modal handles per-finish management on mobile */
+  .finish-hover-panel { display: none; }
+  /* Larger touch targets for qty buttons in the modal */
+  .qty-btn { width: 36px; height: 36px; font-size: 1.1rem; }
+  .finish-row-main { padding: 12px; min-height: 52px; }
+  .finish-row-edit-btn { width: 36px; height: 36px; }
+  /* Keep finish-badges visible on card tiles */
+  .finish-badges { pointer-events: none; }
+}
+
+
   padding: 8px 12px;
   background: var(--bg);
   border: 1px solid var(--surface2);
