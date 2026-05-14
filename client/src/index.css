@@ -516,7 +516,91 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 .owned-summary { color: #22c55e; margin-top: 4px; }
 
 
-/* ── Variant toggle & finish labels ── */
+/* ── Per-finish qty pills (stacked mode, always visible) ── */
+.finish-badges {
+  position: absolute;
+  bottom: 36px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  z-index: 3;
+  pointer-events: none;
+}
+.finish-qty-pill {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.fqp-normal        { background: #374151; color: #e5e7eb; }
+.fqp-holo          { background: #f59e0b; color: #000; }
+.fqp-reverse-holo  { background: #1d4ed8; color: #fff; }
+.fqp-first-edition { background: #7c3aed; color: #fff; }
+
+/* ── Finish hover panel (stacked mode, shown on hover) ── */
+.finish-hover-panel {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  background: rgba(0,0,0,0.85);
+  border-radius: 8px;
+  padding: 5px 7px;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  min-width: 96px;
+}
+.card-item:hover .finish-hover-panel {
+  opacity: 1;
+  pointer-events: auto;
+}
+.fhp-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.fhp-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  min-width: 18px;
+  text-align: center;
+}
+.fhp-label-normal        { background: #374151; color: #e5e7eb; }
+.fhp-label-holo          { background: #f59e0b; color: #000; }
+.fhp-label-reverse-holo  { background: #1d4ed8; color: #fff; }
+.fhp-label-first-edition { background: #7c3aed; color: #fff; }
+
+.fhp-add-btn {
+  border: none;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 6px;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: opacity 0.15s;
+}
+.fhp-add-btn:hover:not(:disabled) { opacity: 0.85; }
+.fhp-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.fhp-add-normal        { background: #374151; color: #e5e7eb; }
+.fhp-add-holo          { background: #f59e0b; color: #000; }
+.fhp-add-reverse-holo  { background: #1d4ed8; color: #fff; }
+.fhp-add-first-edition { background: #7c3aed; color: #fff; }
+
+
 .variant-toggle { border: 1px solid var(--yellow) !important; }
 .variant-toggle.active { background: var(--yellow); color: #000; }
 

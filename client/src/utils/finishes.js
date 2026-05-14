@@ -24,3 +24,10 @@ export const FINISH_LABELS = {
   holo: 'Holo',
   'first edition': '1st Ed.',
 };
+
+export const FINISH_LABELS_SHORT = {
+  normal: 'N',
+  'reverse holo': 'R',
+  holo: 'H',
+  'first edition': '1E',
+};
