@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CardModal from '../components/CardModal.jsx';
-import { getAvailableFinishes, FINISH_LABELS } from '../utils/finishes.js';
+import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from '../utils/finishes.js';
 import { apiFetch } from '../lib/apiFetch.js';
 
 const OWNERSHIP_FILTERS = ['all', 'owned', 'not owned', 'wishlist'];
@@ -210,6 +210,20 @@ export default function CardsPage() {
     await loadCollection();
   };
 
+  const handleAdjust = async (entry, delta) => {
+    const newQty = entry.quantity + delta;
+    if (newQty <= 0) {
+      await apiFetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
+    } else {
+      await apiFetch(`/api/collection/${entry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: newQty, condition: entry.condition, wishlist: entry.wishlist, notes: entry.notes }),
+      });
+    }
+    await loadCollection();
+  };
+
   if (loading) return <div className="loading">Loading cards…</div>;
   if (loadError) return (
     <div style={{ padding: 32 }}>
@@ -347,25 +361,69 @@ export default function CardsPage() {
               {/* Wishlist star */}
               {isWishlist && <span className="card-badge wishlist">★</span>}
 
-              {/* Owned: always-visible qty badge + hover qty controls */}
-              {isOwned ? (
+              {/* Owned: qty badges + hover controls; unowned: quick-add — both per-finish in stacked mode */}
+              {finish === null ? (
+                /* ── Stacked mode: per-finish badges & controls ── */
                 <>
-                  <span className="qty-badge">×{qty}</span>
-                  <div className="qty-controls" onClick={(e) => e.stopPropagation()}>
-                    <button className="qty-btn" onClick={(e) => adjustQty(e, ownedEntries[0], -1)}>−</button>
-                    <span className="qty-value">×{qty}</span>
-                    <button className="qty-btn" onClick={(e) => adjustQty(e, ownedEntries[0], +1)}>+</button>
+                  {ownedEntries.length > 0 && (
+                    <div className="finish-badges">
+                      {ownedEntries.map((e) => (
+                        <span key={e.finish} className={`finish-qty-pill fqp-${e.finish.replace(' ', '-')}`}>
+                          {FINISH_LABELS_SHORT[e.finish] ?? e.finish}×{e.quantity}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="finish-hover-panel" onClick={(e) => e.stopPropagation()}>
+                    {ownedEntries.map((e) => (
+                      <div key={e.finish} className="fhp-row">
+                        <span className={`fhp-label fhp-label-${e.finish.replace(' ', '-')}`}>
+                          {FINISH_LABELS_SHORT[e.finish] ?? e.finish}
+                        </span>
+                        <button className="qty-btn" onClick={(ev) => adjustQty(ev, e, -1)}>−</button>
+                        <span className="qty-value">×{e.quantity}</span>
+                        <button className="qty-btn" onClick={(ev) => adjustQty(ev, e, +1)}>+</button>
+                      </div>
+                    ))}
+                    {getAvailableFinishes(card.variants)
+                      .filter((f) => !ownedEntries.some((e) => e.finish === f))
+                      .map((f) => {
+                        const qaKey = `${card.id}:${f}`;
+                        return (
+                          <button
+                            key={f}
+                            className={`fhp-add-btn fhp-add-${f.replace(' ', '-')}`}
+                            title={`Quick add ${FINISH_LABELS[f]} (mint)`}
+                            onClick={(ev) => quickAdd(ev, card, f)}
+                            disabled={quickAdding.has(qaKey)}
+                          >
+                            {quickAdding.has(qaKey) ? '…' : `+${FINISH_LABELS_SHORT[f] ?? f}`}
+                          </button>
+                        );
+                      })}
                   </div>
                 </>
               ) : (
-                <button
-                  className="quick-add-btn"
-                  title={`Quick add ${FINISH_LABELS[defaultFinish]} (mint)`}
-                  onClick={(e) => quickAdd(e, card, defaultFinish)}
-                  disabled={quickAdding.has(tileKey)}
-                >
-                  {quickAdding.has(tileKey) ? '…' : '+'}
-                </button>
+                /* ── Unstacked mode: single-finish behavior ── */
+                isOwned ? (
+                  <>
+                    <span className="qty-badge">×{qty}</span>
+                    <div className="qty-controls" onClick={(e) => e.stopPropagation()}>
+                      <button className="qty-btn" onClick={(e) => adjustQty(e, ownedEntries[0], -1)}>−</button>
+                      <span className="qty-value">×{qty}</span>
+                      <button className="qty-btn" onClick={(e) => adjustQty(e, ownedEntries[0], +1)}>+</button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    className="quick-add-btn"
+                    title={`Quick add ${FINISH_LABELS[defaultFinish]} (mint)`}
+                    onClick={(e) => quickAdd(e, card, defaultFinish)}
+                    disabled={quickAdding.has(tileKey)}
+                  >
+                    {quickAdding.has(tileKey) ? '…' : '+'}
+                  </button>
+                )
               )}
 
               <div className="card-item-info">
@@ -396,6 +454,7 @@ export default function CardsPage() {
           onClose={() => setSelectedCard(null)}
           onSave={handleSave}
           onDelete={handleDelete}
+          onAdjust={handleAdjust}
         />
       )}
     </div>
