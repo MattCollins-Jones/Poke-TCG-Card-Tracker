@@ -247,7 +247,7 @@ export default function SearchPage() {
             </button>
           </div>
 
-          <div className="cards-grid" style={{ '--grid-cols': Math.min(setCards.length, 7) }}>
+          <div className="cards-grid search-results-grid">
             {setCards.map((card) => {
               const entries = setCollection[card.id] ?? [];
               const ownedEntries = entries.filter((e) => !e.wishlist);

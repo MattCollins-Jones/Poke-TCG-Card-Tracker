@@ -65,6 +65,45 @@ body {
 .navbar-signout { background: transparent; border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; }
 .navbar-signout:hover { background: var(--surface2); color: var(--yellow); }
 
+/* ── Admin dropdown ── */
+.admin-dropdown { position: relative; }
+.admin-dropdown-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.admin-dropdown-btn:hover { background: var(--surface2); color: var(--yellow); }
+.admin-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  min-width: 148px;
+  box-shadow: var(--shadow);
+  z-index: 200;
+  overflow: hidden;
+}
+.admin-dropdown-menu a {
+  display: block;
+  padding: 10px 16px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.admin-dropdown-menu a:hover,
+.admin-dropdown-menu a.active { background: var(--surface2); color: var(--yellow); }
+
 .currency-select {
   background: var(--surface2);
   border: 1px solid var(--surface2);
@@ -175,6 +214,11 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   display: grid;
   grid-template-columns: repeat(var(--grid-cols, 7), 1fr);
   gap: 14px;
+}
+
+/* Search results: consistent card size regardless of set size */
+.search-results-grid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
 }
 
 .card-item {
@@ -1090,6 +1134,7 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   .navbar-email { display: none; }
   .navbar-user { gap: 6px; }
   .navbar-signout { padding: 4px 8px; }
+  .admin-dropdown-btn { font-size: 0.85rem; padding: 3px 6px; }
 
   /* Search input: full width */
   .search-input { width: 100%; }
@@ -1103,6 +1148,9 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   .cards-grid {
     grid-template-columns: repeat(min(var(--grid-cols, 3), 4), 1fr);
     gap: 8px;
+  }
+  .search-results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 
   /* Card info: smaller text */
