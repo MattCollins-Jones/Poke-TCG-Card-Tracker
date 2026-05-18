@@ -19,7 +19,7 @@ function shapeCard(c, setMap) {
           images: { symbol: setInfo.symbol_image ?? null, logo: setInfo.logo_image ?? null },
         }
       : { id: c.set_id },
-    pricing: !setMap && (c.cm_trend || c.tcp_normal_market) ? {
+    pricing: (c.cm_trend || c.tcp_normal_market) ? {
       cardmarket: c.cm_trend != null ? {
         trend: c.cm_trend,
         avg30: c.cm_avg30,
@@ -43,7 +43,7 @@ async function handleSearch(req, res, supabase) {
 
   const { data: cards, error } = await supabase
     .from('cards')
-    .select('id, name, number, rarity, subtypes, variants, small_image, large_image, set_id')
+    .select('id, name, number, rarity, subtypes, variants, small_image, large_image, set_id, cm_trend, cm_avg30, cm_low, cm_trend_holo, cm_avg30_holo, tcp_normal_market, tcp_normal_low, tcp_reverse_market, price_updated_at')
     .ilike('name', `%${q.trim()}%`)
     .eq('hidden', false)
     .order('name')
