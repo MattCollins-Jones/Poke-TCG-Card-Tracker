@@ -11,6 +11,7 @@ import WishlistPage from './pages/WishlistPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import SearchPage from './pages/SearchPage.jsx';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<SetsPage />} />
                   <Route path="/sets/:setId" element={<CardsPage />} />
+                  <Route path="/search" element={<SearchPage />} />
                   <Route path="/collection" element={<CollectionPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
                   <Route path="/sync" element={<SyncPage />} />

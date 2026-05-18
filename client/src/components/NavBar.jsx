@@ -10,6 +10,7 @@ export default function NavBar() {
     <nav className="navbar">
       <NavLink to="/" className="navbar-brand">🎴 PokéTracker</NavLink>
       <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Browse Sets</NavLink>
+      <NavLink to="/search" className={({ isActive }) => isActive ? 'active' : ''}>🔍 Search Cards</NavLink>
       <NavLink to="/collection" className={({ isActive }) => isActive ? 'active' : ''}>My Collection</NavLink>
       <NavLink to="/wishlist" className={({ isActive }) => isActive ? 'active' : ''}>Wishlist</NavLink>
       {isAdmin && (
