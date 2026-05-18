@@ -621,12 +621,15 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   padding: 5px 7px;
   z-index: 4;
   opacity: 0;
-  transition: opacity 0.15s;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0s 0.15s;
   pointer-events: none;
   min-width: 96px;
 }
 .card-item:hover .finish-hover-panel {
   opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s, visibility 0s;
   pointer-events: auto;
 }
 .fhp-row {
@@ -829,6 +832,11 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   color: #ff9800;
   font-size: 0.85rem;
   flex-shrink: 0;
+}
+.finish-row-remove-wish-btn {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  margin-left: 4px;
 }
 
 /* Inline expand form inside a finish row */

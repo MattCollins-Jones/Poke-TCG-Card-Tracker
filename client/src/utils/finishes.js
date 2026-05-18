@@ -31,3 +31,10 @@ export const FINISH_LABELS_SHORT = {
   holo: 'H',
   'first edition': '1E',
 };
+
+export const FINISH_TO_VARIANT_KEY = {
+  normal: 'normal',
+  holo: 'holo',
+  'reverse holo': 'reverse',
+  'first edition': 'firstEdition',
+};

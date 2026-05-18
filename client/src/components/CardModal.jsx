@@ -206,7 +206,15 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
                     </button>
                   )}
                   {wishlistEntry && !entry && (
-                    <span className="finish-row-wishlist" title="On wishlist">★</span>
+                    <>
+                      <span className="finish-row-wishlist" title="On wishlist">★ Wishlist</span>
+                      <button
+                        className="fhp-remove-btn finish-row-remove-wish-btn"
+                        title="Remove from wishlist"
+                        onClick={() => handleRemove(wishlistEntry)}
+                        disabled={saving}
+                      >✕ Remove</button>
+                    </>
                   )}
                 </div>
 
