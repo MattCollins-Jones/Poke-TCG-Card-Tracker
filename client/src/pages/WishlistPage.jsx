@@ -1,15 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import CardModal from '../components/CardModal.jsx';
 import { apiFetch } from '../lib/apiFetch.js';
-import { FINISH_LABELS_SHORT } from '../utils/finishes.js';
+import { FINISH_LABELS_SHORT, FINISH_TO_VARIANT_KEY } from '../utils/finishes.js';
 
 function variantsFromEntries(entries) {
   const v = {};
   entries.forEach((e) => {
-    if (e.finish === 'normal') v.normal = true;
-    if (e.finish === 'holo') v.holo = true;
-    if (e.finish === 'reverse holo') v.reverse = true;
-    if (e.finish === 'first edition') v.firstEdition = true;
+    const key = FINISH_TO_VARIANT_KEY[e.finish];
+    if (key) v[key] = true;
   });
   return v;
 }
@@ -21,13 +19,22 @@ export default function WishlistPage() {
   const [selectedCard, setSelectedCard] = useState(null);
 
   const loadWishlist = useCallback(() => {
-    apiFetch('/api/collection?wishlist=true')
+    return apiFetch('/api/collection?wishlist=true')
       .then((r) => r.json())
-      .then((rows) => { setWishlist(rows); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((rows) => { setWishlist(rows); setLoading(false); return rows; })
+      .catch(() => { setLoading(false); return []; });
   }, []);
 
   useEffect(() => { loadWishlist(); }, [loadWishlist]);
+
+  const syncSelectedCard = (rows) => {
+    setSelectedCard((prev) => {
+      if (!prev) return null;
+      const updatedEntries = rows.filter((e) => e.card_id === prev.id);
+      if (updatedEntries.length === 0) return null;
+      return { ...prev, entries: updatedEntries };
+    });
+  };
 
   const filtered = wishlist.filter((e) =>
     !search || e.card_name.toLowerCase().includes(search.toLowerCase())
@@ -59,12 +66,14 @@ export default function WishlistPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    loadWishlist();
+    const rows = await loadWishlist();
+    syncSelectedCard(rows);
   };
 
   const handleDelete = async (id) => {
     await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
-    loadWishlist();
+    const rows = await loadWishlist();
+    syncSelectedCard(rows);
   };
 
   const handleAdjust = async (entry, delta) => {
@@ -78,7 +87,8 @@ export default function WishlistPage() {
         body: JSON.stringify({ quantity: newQty, condition: entry.condition, wishlist: entry.wishlist, notes: entry.notes }),
       });
     }
-    loadWishlist();
+    const rows = await loadWishlist();
+    syncSelectedCard(rows);
   };
 
   if (loading) return <div className="loading">Loading wishlist…</div>;
