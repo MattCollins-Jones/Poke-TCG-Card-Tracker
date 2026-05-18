@@ -395,12 +395,15 @@ export default function SetsPage() {
                                       <button className="fhp-remove-btn" title="Remove from wishlist" onClick={async (ev) => {
                                         ev.stopPropagation();
                                         setQuickAdding((s) => new Set(s).add(wKey));
-                                        const ok = await handleDelete(wishlistEntry.id, card.set.id);
-                                        const remaining = (setCollection[card.id] ?? []).filter((en) => en.wishlist && en.id !== wishlistEntry.id);
-                                        if (ok && remaining.length === 0) {
-                                          setOwnedMap((prev) => { const next = { ...prev }; if (next[card.id]) next[card.id] = { ...next[card.id], wishlist: false }; return next; });
+                                        try {
+                                          const ok = await handleDelete(wishlistEntry.id, card.set.id);
+                                          const remaining = (setCollection[card.id] ?? []).filter((en) => en.wishlist && en.id !== wishlistEntry.id);
+                                          if (ok && remaining.length === 0) {
+                                            setOwnedMap((prev) => { const next = { ...prev }; if (next[card.id]) next[card.id] = { ...next[card.id], wishlist: false }; return next; });
+                                          }
+                                        } finally {
+                                          setQuickAdding((s) => { const n = new Set(s); n.delete(wKey); return n; });
                                         }
-                                        setQuickAdding((s) => { const n = new Set(s); n.delete(wKey); return n; });
                                       }} disabled={quickAdding.has(wKey) || quickAdding.has(qaKey)}>{quickAdding.has(wKey) ? "…" : "✕"}</button>
                                     </div>
                                   );
