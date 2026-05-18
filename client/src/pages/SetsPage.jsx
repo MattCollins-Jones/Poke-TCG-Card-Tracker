@@ -354,6 +354,7 @@ export default function SetsPage() {
                           key={card.id}
                           className={`card-item${isOwned ? " owned" : ""}${showWishlist ? " wishlist" : ""}`}
                           onClick={() => openCard(card)}
+                          onMouseEnter={() => { if ((cardOwned?.wishlist || cardOwned?.owned) && !hasLoadedSetData) loadSetCollection(card.set.id); }}
                         >
                           {card.images?.small
                             ? <img src={card.images.small} alt={card.name} loading="lazy" />
@@ -369,8 +370,12 @@ export default function SetsPage() {
                               ))}
                             </div>
                           )}
-                          {(hasLoadedSetData || (ownedMapLoaded && !cardOwned?.owned && !cardOwned?.wishlist)) && (
+                          {(hasLoadedSetData || ownedMapLoaded) && (
                           <div className="finish-hover-panel" onClick={(e) => e.stopPropagation()}>
+                            {(cardOwned?.wishlist || cardOwned?.owned) && !hasLoadedSetData ? (
+                              <div className="fhp-loading">…</div>
+                            ) : (
+                            <>
                             {ownedEntries.map((e) => (
                               <div key={e.finish} className="fhp-row">
                                 <span className={`fhp-label fhp-label-${e.finish.replace(" ", "-")}`}>{FINISH_LABELS_SHORT[e.finish] ?? e.finish}</span>
@@ -419,6 +424,8 @@ export default function SetsPage() {
                                   </div>
                                 );
                               })}
+                            </>
+                            )}
                           </div>
                           )}
                           <div className="card-item-info">

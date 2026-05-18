@@ -632,6 +632,12 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   transition: opacity 0.15s, visibility 0s;
   pointer-events: auto;
 }
+.fhp-loading {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 4px 0;
+}
 .fhp-row {
   display: flex;
   align-items: center;
