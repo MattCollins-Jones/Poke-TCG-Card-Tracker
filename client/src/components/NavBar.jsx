@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCurrency, CURRENCIES } from '../context/CurrencyContext.jsx';
@@ -5,6 +6,17 @@ import { useCurrency, CURRENCIES } from '../context/CurrencyContext.jsx';
 export default function NavBar() {
   const { user, signOut, isAdmin } = useAuth();
   const { currency, setCurrency } = useCurrency();
+  const [adminOpen, setAdminOpen] = useState(false);
+  const adminRef = useRef(null);
+
+  useEffect(() => {
+    if (!adminOpen) return;
+    const handleClick = (e) => {
+      if (adminRef.current && !adminRef.current.contains(e.target)) setAdminOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [adminOpen]);
 
   return (
     <nav className="navbar">
@@ -14,10 +26,17 @@ export default function NavBar() {
       <NavLink to="/collection" className={({ isActive }) => isActive ? 'active' : ''}>My Collection</NavLink>
       <NavLink to="/wishlist" className={({ isActive }) => isActive ? 'active' : ''}>Wishlist</NavLink>
       {isAdmin && (
-        <NavLink to="/sync" className={({ isActive }) => isActive ? 'active' : ''} style={{ fontSize: '0.85rem' }}>🔄 Sync</NavLink>
-      )}
-      {isAdmin && (
-        <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''} style={{ fontSize: '0.85rem' }}>⚙️ Admin</NavLink>
+        <div className="admin-dropdown" ref={adminRef}>
+          <button className="admin-dropdown-btn" onClick={() => setAdminOpen((o) => !o)}>
+            ⚙️ Admin {adminOpen ? '▲' : '▾'}
+          </button>
+          {adminOpen && (
+            <div className="admin-dropdown-menu">
+              <NavLink to="/sync" onClick={() => setAdminOpen(false)}>🔄 Sync</NavLink>
+              <NavLink to="/admin" onClick={() => setAdminOpen(false)}>🛠️ Manage</NavLink>
+            </div>
+          )}
+        </div>
       )}
       <select
         className="currency-select"
