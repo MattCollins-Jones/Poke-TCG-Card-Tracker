@@ -181,8 +181,7 @@ export default function CardsPage() {
     setQuickAdding((s) => { const n = new Set(s); n.delete(key); return n; });
   };
 
-  const adjustQty = async (e, entry, delta) => {
-    e.stopPropagation();
+  const updateEntryQty = useCallback(async (entry, delta) => {
     const newQty = entry.quantity + delta;
     if (newQty <= 0) {
       await apiFetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
@@ -194,7 +193,14 @@ export default function CardsPage() {
       });
     }
     await loadCollection();
+  }, [loadCollection]);
+
+  const adjustQty = async (e, entry, delta) => {
+    e.stopPropagation();
+    await updateEntryQty(entry, delta);
   };
+
+  const handleAdjust = (entry, delta) => updateEntryQty(entry, delta);
 
   const handleSave = async (payload) => {
     await apiFetch('/api/collection', {
@@ -207,20 +213,6 @@ export default function CardsPage() {
 
   const handleDelete = async (id) => {
     await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
-    await loadCollection();
-  };
-
-  const handleAdjust = async (entry, delta) => {
-    const newQty = entry.quantity + delta;
-    if (newQty <= 0) {
-      await apiFetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
-    } else {
-      await apiFetch(`/api/collection/${entry.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: newQty, condition: entry.condition, wishlist: entry.wishlist, notes: entry.notes }),
-      });
-    }
     await loadCollection();
   };
 
