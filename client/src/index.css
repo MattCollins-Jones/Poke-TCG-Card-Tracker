@@ -1332,3 +1332,19 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   color: var(--text-muted);
   opacity: 0.7;
 }
+
+/* ── Global card search page ── */
+.search-set-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--surface2);
+}
+.search-set-symbol {
+  height: 26px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}

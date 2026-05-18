@@ -32,8 +32,11 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
 
   const handleAdjust = async (entry, delta) => {
     setAdjusting((s) => new Set(s).add(entry.id));
-    await onAdjust(entry, delta);
-    setAdjusting((s) => { const n = new Set(s); n.delete(entry.id); return n; });
+    try {
+      await onAdjust(entry, delta);
+    } finally {
+      setAdjusting((s) => { const n = new Set(s); n.delete(entry.id); return n; });
+    }
   };
 
   const startEditing = (entry) => {
@@ -75,12 +78,13 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
   };
 
   const handleAddFinish = async () => {
+    const qty = Math.max(1, parseInt(addQty, 10) || 1);
     setSaving(true);
     await onSave({
       card_id: card.id, set_id: card.set.id, card_name: card.name,
       set_name: setName ?? card.set?.name ?? card.set?.id ?? '',
       card_number: card.number, card_image: card.images?.small, rarity: card.rarity,
-      finish: addingFinish, quantity: parseInt(addQty, 10),
+      finish: addingFinish, quantity: qty,
       condition: addCondition, wishlist: addWishlist, notes: addNotes,
     });
     setSaving(false);
@@ -254,7 +258,7 @@ export default function CardModal({ card, collectionEntries = [], setName, initi
                     </div>
                     <div className="finish-inline-actions">
                       <button className="btn btn-ghost btn-sm" onClick={() => setAddingFinish(null)}>Cancel</button>
-                      <button className="btn btn-primary btn-sm" onClick={handleAddFinish} disabled={saving}>
+                      <button className="btn btn-primary btn-sm" onClick={handleAddFinish} disabled={saving || !(parseInt(addQty, 10) >= 1)}>
                         {saving ? 'Saving…' : 'Add'}
                       </button>
                     </div>

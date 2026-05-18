@@ -48,6 +48,20 @@ export default function CollectionPage() {
     loadCollection();
   };
 
+  const handleAdjust = async (entry, delta) => {
+    const newQty = entry.quantity + delta;
+    if (newQty <= 0) {
+      await apiFetch(`/api/collection/${entry.id}`, { method: 'DELETE' });
+    } else {
+      await apiFetch(`/api/collection/${entry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: newQty, condition: entry.condition, wishlist: entry.wishlist, notes: entry.notes }),
+      });
+    }
+    loadCollection();
+  };
+
   if (loading) return <div className="loading">Loading collection…</div>;
 
   const totalCards = collection.reduce((sum, e) => sum + e.quantity, 0);
@@ -136,10 +150,11 @@ export default function CollectionPage() {
             images: { small: selectedEntry.card_image },
             set: { id: selectedEntry.set_id, name: selectedEntry.set_name },
           }}
-          collectionEntry={selectedEntry}
+          collectionEntries={[selectedEntry]}
           onClose={() => setSelectedEntry(null)}
           onSave={handleSave}
           onDelete={handleDelete}
+          onAdjust={handleAdjust}
         />
       )}
     </div>
