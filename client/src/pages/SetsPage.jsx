@@ -370,8 +370,12 @@ export default function SetsPage() {
                               ))}
                             </div>
                           )}
-                          {(hasLoadedSetData || (ownedMapLoaded && !cardOwned?.owned && !cardOwned?.wishlist) || (ownedMapLoaded && cardOwned?.wishlist)) && (
+                          {(hasLoadedSetData || ownedMapLoaded) && (
                           <div className="finish-hover-panel" onClick={(e) => e.stopPropagation()}>
+                            {(cardOwned?.wishlist || cardOwned?.owned) && !hasLoadedSetData ? (
+                              <div className="fhp-loading">…</div>
+                            ) : (
+                            <>
                             {ownedEntries.map((e) => (
                               <div key={e.finish} className="fhp-row">
                                 <span className={`fhp-label fhp-label-${e.finish.replace(" ", "-")}`}>{FINISH_LABELS_SHORT[e.finish] ?? e.finish}</span>
@@ -420,6 +424,8 @@ export default function SetsPage() {
                                   </div>
                                 );
                               })}
+                            </>
+                            )}
                           </div>
                           )}
                           <div className="card-item-info">
