@@ -132,6 +132,19 @@ export default function SetsPage() {
     setQuickAdding((s) => { const n = new Set(s); n.delete(key); return n; });
   };
 
+  const quickAddWishlist = async (e, card, finish) => {
+    e.stopPropagation();
+    const key = `${card.id}:${finish}:wish`;
+    setQuickAdding((s) => new Set(s).add(key));
+    await apiFetch("/api/collection", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ card_id: card.id, set_id: card.set.id, card_name: card.name, set_name: card.set.name, card_number: card.number, card_image: card.images?.small, rarity: card.rarity, finish, quantity: 1, condition: "mint", wishlist: true }),
+    });
+    await loadSetCollection(card.set.id);
+    setOwnedMap((prev) => { const next = { ...prev }; if (!next[card.id]) next[card.id] = { owned: false, wishlist: false }; next[card.id].wishlist = true; return next; });
+    setQuickAdding((s) => { const n = new Set(s); n.delete(key); return n; });
+  };
+
   const handleSave = async (payload) => {
     await apiFetch("/api/collection", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (selectedCard) await loadSetCollection(selectedCard.card.set.id);
@@ -351,10 +364,28 @@ export default function SetsPage() {
                               .filter((f) => !ownedEntries.some((e) => e.finish === f))
                               .map((f) => {
                                 const qaKey = `${card.id}:${f}`;
+                                const wKey = `${card.id}:${f}:wish`;
+                                const wishlistEntry = entries.find((we) => we.finish === f && we.wishlist);
+                                if (wishlistEntry) {
+                                  return (
+                                    <div key={f} className="fhp-wish-row">
+                                      <span className="fhp-wish-badge" title={`${FINISH_LABELS[f] ?? f} on wishlist`}>★{FINISH_LABELS_SHORT[f]}</span>
+                                      <button className={`fhp-add-btn fhp-add-${f.replace(" ", "-")}`} title={`Add ${FINISH_LABELS[f]} to collection`} onClick={(ev) => quickAdd(ev, card, f)} disabled={quickAdding.has(qaKey)}>
+                                        {quickAdding.has(qaKey) ? "..." : "+"}
+                                      </button>
+                                      <button className="qty-btn" title="Remove from wishlist" onClick={async (ev) => { ev.stopPropagation(); await handleDelete(wishlistEntry.id); }}>✕</button>
+                                    </div>
+                                  );
+                                }
                                 return (
-                                  <button key={f} className={`fhp-add-btn fhp-add-${f.replace(" ", "-")}`} title={`Quick add ${FINISH_LABELS[f]} (mint)`} onClick={(ev) => quickAdd(ev, card, f)} disabled={quickAdding.has(qaKey)}>
-                                    {quickAdding.has(qaKey) ? "..." : `+${FINISH_LABELS_SHORT[f] ?? f}`}
-                                  </button>
+                                  <div key={f} className="fhp-unowned-row">
+                                    <button className={`fhp-add-btn fhp-add-${f.replace(" ", "-")}`} title={`Quick add ${FINISH_LABELS[f]} (mint)`} onClick={(ev) => quickAdd(ev, card, f)} disabled={quickAdding.has(qaKey)}>
+                                      {quickAdding.has(qaKey) ? "..." : `+${FINISH_LABELS_SHORT[f] ?? f}`}
+                                    </button>
+                                    <button className="fhp-wish-btn" title={`Add ${FINISH_LABELS[f]} to wishlist`} onClick={(ev) => quickAddWishlist(ev, card, f)} disabled={quickAdding.has(wKey)}>
+                                      {quickAdding.has(wKey) ? "..." : "★"}
+                                    </button>
+                                  </div>
                                 );
                               })}
                           </div>

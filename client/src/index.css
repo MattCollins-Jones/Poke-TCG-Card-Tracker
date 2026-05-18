@@ -665,6 +665,25 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 .fhp-add-reverse-holo  { background: #1d4ed8; color: #fff; }
 .fhp-add-first-edition { background: #7c3aed; color: #fff; }
 
+.fhp-unowned-row { display: flex; gap: 3px; align-items: center; }
+.fhp-unowned-row .fhp-add-btn { flex: 1; }
+.fhp-wish-btn {
+  border: 1px solid var(--yellow);
+  background: none;
+  color: var(--yellow);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  padding: 3px 5px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.fhp-wish-btn:hover:not(:disabled) { background: var(--yellow); color: #000; }
+.fhp-wish-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.fhp-wish-row { display: flex; gap: 3px; align-items: center; }
+.fhp-wish-badge { color: var(--yellow); font-size: 0.7rem; font-weight: 700; flex: 1; }
+
 
 .variant-toggle { border: 1px solid var(--yellow) !important; }
 .variant-toggle.active { background: var(--yellow); color: #000; }
