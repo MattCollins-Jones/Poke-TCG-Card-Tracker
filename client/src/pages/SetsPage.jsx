@@ -165,9 +165,10 @@ export default function SetsPage() {
   };
 
   const handleDelete = async (id, setId) => {
-    await apiFetch(`/api/collection/${id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/collection/${id}`, { method: "DELETE" });
     const sid = setId ?? selectedCard?.card?.set?.id;
     if (sid) await loadSetCollection(sid);
+    return res.ok;
   };
 
   const handleAdjust = async (entry, delta) => {
@@ -368,7 +369,7 @@ export default function SetsPage() {
                               ))}
                             </div>
                           )}
-                          {(hasLoadedSetData || (!cardOwned?.owned && !cardOwned?.wishlist)) && (
+                          {(hasLoadedSetData || (ownedMapLoaded && !cardOwned?.owned && !cardOwned?.wishlist)) && (
                           <div className="finish-hover-panel" onClick={(e) => e.stopPropagation()}>
                             {ownedEntries.map((e) => (
                               <div key={e.finish} className="fhp-row">
@@ -394,9 +395,9 @@ export default function SetsPage() {
                                       <button className="fhp-remove-btn" title="Remove from wishlist" onClick={async (ev) => {
                                         ev.stopPropagation();
                                         setQuickAdding((s) => new Set(s).add(wKey));
-                                        await handleDelete(wishlistEntry.id, card.set.id);
+                                        const ok = await handleDelete(wishlistEntry.id, card.set.id);
                                         const remaining = (setCollection[card.id] ?? []).filter((en) => en.wishlist && en.id !== wishlistEntry.id);
-                                        if (remaining.length === 0) {
+                                        if (ok && remaining.length === 0) {
                                           setOwnedMap((prev) => { const next = { ...prev }; if (next[card.id]) next[card.id] = { ...next[card.id], wishlist: false }; return next; });
                                         }
                                         setQuickAdding((s) => { const n = new Set(s); n.delete(wKey); return n; });
