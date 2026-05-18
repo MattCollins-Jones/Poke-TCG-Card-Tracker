@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import CardModal from "../components/CardModal.jsx";
 import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from "../utils/finishes.js";
