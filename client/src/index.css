@@ -683,6 +683,20 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 .fhp-wish-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .fhp-wish-row { display: flex; gap: 3px; align-items: center; }
 .fhp-wish-badge { color: var(--yellow); font-size: 0.7rem; font-weight: 700; flex: 1; }
+.fhp-remove-btn {
+  border: 1px solid #ef9a9a;
+  background: none;
+  color: #ef9a9a;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  padding: 3px 5px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.fhp-remove-btn:hover:not(:disabled) { background: #ef9a9a; color: #000; }
+.fhp-remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
 .variant-toggle { border: 1px solid var(--yellow) !important; }

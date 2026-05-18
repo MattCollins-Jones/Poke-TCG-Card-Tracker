@@ -165,9 +165,10 @@ export default function SetsPage() {
   };
 
   const handleDelete = async (id, setId) => {
-    await apiFetch(`/api/collection/${id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/collection/${id}`, { method: "DELETE" });
     const sid = setId ?? selectedCard?.card?.set?.id;
     if (sid) await loadSetCollection(sid);
+    return res.ok;
   };
 
   const handleAdjust = async (entry, delta) => {
@@ -368,6 +369,7 @@ export default function SetsPage() {
                               ))}
                             </div>
                           )}
+                          {(hasLoadedSetData || (ownedMapLoaded && !cardOwned?.owned && !cardOwned?.wishlist)) && (
                           <div className="finish-hover-panel" onClick={(e) => e.stopPropagation()}>
                             {ownedEntries.map((e) => (
                               <div key={e.finish} className="fhp-row">
@@ -383,9 +385,6 @@ export default function SetsPage() {
                                 const qaKey = `${card.id}:${f}`;
                                 const wKey = `${card.id}:${f}:wish`;
                                 const wishlistEntry = entries.find((we) => we.finish === f && we.wishlist);
-                                if (!hasLoadedSetData && (cardOwned?.owned || cardOwned?.wishlist)) {
-                                  return null;
-                                }
                                 if (wishlistEntry) {
                                   return (
                                     <div key={f} className="fhp-wish-row">
@@ -393,7 +392,16 @@ export default function SetsPage() {
                                       <button className={`fhp-add-btn fhp-add-${f.replace(" ", "-")}`} title={`Add ${FINISH_LABELS[f]} to collection`} onClick={(ev) => quickMoveToCollection(ev, card, f, wishlistEntry)} disabled={quickAdding.has(qaKey) || quickAdding.has(wKey)}>
                                         {quickAdding.has(qaKey) ? "…" : "+"}
                                       </button>
-                                      <button className="qty-btn" title="Remove from wishlist" onClick={async (ev) => { ev.stopPropagation(); setQuickAdding((s) => new Set(s).add(wKey)); await handleDelete(wishlistEntry.id, card.set.id); setQuickAdding((s) => { const n = new Set(s); n.delete(wKey); return n; }); }} disabled={quickAdding.has(wKey) || quickAdding.has(qaKey)}>{quickAdding.has(wKey) ? "…" : "✕"}</button>
+                                      <button className="fhp-remove-btn" title="Remove from wishlist" onClick={async (ev) => {
+                                        ev.stopPropagation();
+                                        setQuickAdding((s) => new Set(s).add(wKey));
+                                        const ok = await handleDelete(wishlistEntry.id, card.set.id);
+                                        const remaining = (setCollection[card.id] ?? []).filter((en) => en.wishlist && en.id !== wishlistEntry.id);
+                                        if (ok && remaining.length === 0) {
+                                          setOwnedMap((prev) => { const next = { ...prev }; if (next[card.id]) next[card.id] = { ...next[card.id], wishlist: false }; return next; });
+                                        }
+                                        setQuickAdding((s) => { const n = new Set(s); n.delete(wKey); return n; });
+                                      }} disabled={quickAdding.has(wKey) || quickAdding.has(qaKey)}>{quickAdding.has(wKey) ? "…" : "✕"}</button>
                                     </div>
                                   );
                                 }
@@ -409,6 +417,7 @@ export default function SetsPage() {
                                 );
                               })}
                           </div>
+                          )}
                           <div className="card-item-info">
                             <div className="card-item-name">{card.name}</div>
                             <div className="card-item-number">
