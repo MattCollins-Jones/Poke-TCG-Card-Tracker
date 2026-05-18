@@ -830,6 +830,11 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   font-size: 0.85rem;
   flex-shrink: 0;
 }
+.finish-row-remove-wish-btn {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  margin-left: 4px;
+}
 
 /* Inline expand form inside a finish row */
 .finish-inline-form {

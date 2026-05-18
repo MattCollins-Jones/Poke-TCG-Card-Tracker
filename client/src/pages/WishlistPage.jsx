@@ -1,12 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import CardModal from '../components/CardModal.jsx';
 import { apiFetch } from '../lib/apiFetch.js';
+import { FINISH_LABELS_SHORT } from '../utils/finishes.js';
+
+function variantsFromEntries(entries) {
+  const v = {};
+  entries.forEach((e) => {
+    if (e.finish === 'normal') v.normal = true;
+    if (e.finish === 'holo') v.holo = true;
+    if (e.finish === 'reverse holo') v.reverse = true;
+    if (e.finish === 'first edition') v.firstEdition = true;
+  });
+  return v;
+}
 
 export default function WishlistPage() {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedEntry, setSelectedEntry] = useState(null);
+  const [selectedCard, setSelectedCard] = useState(null);
 
   const loadWishlist = useCallback(() => {
     apiFetch('/api/collection?wishlist=true')
@@ -22,9 +34,22 @@ export default function WishlistPage() {
   );
 
   const grouped = filtered.reduce((acc, entry) => {
-    const key = entry.set_id;
-    if (!acc[key]) acc[key] = { name: entry.set_name, entries: [] };
-    acc[key].entries.push(entry);
+    const setKey = entry.set_id;
+    if (!acc[setKey]) acc[setKey] = { name: entry.set_name, cards: {} };
+    const cardKey = entry.card_id;
+    if (!acc[setKey].cards[cardKey]) {
+      acc[setKey].cards[cardKey] = {
+        id: entry.card_id,
+        name: entry.card_name,
+        number: entry.card_number,
+        rarity: entry.rarity,
+        image: entry.card_image,
+        set_id: entry.set_id,
+        set_name: entry.set_name,
+        entries: [],
+      };
+    }
+    acc[setKey].cards[cardKey].entries.push(entry);
     return acc;
   }, {});
 
@@ -87,26 +112,38 @@ export default function WishlistPage() {
             <div key={setId} className="collection-set-group">
               <div className="collection-set-header">
                 <h2>{group.name}</h2>
-                <span className="progress-label">{group.entries.length} cards</span>
+                <span className="progress-label">{Object.keys(group.cards).length} cards</span>
               </div>
               <div className="cards-grid">
-                {group.entries.map((entry) => (
+                {Object.values(group.cards).map((cardGroup) => (
                   <div
-                    key={entry.id}
+                    key={cardGroup.id}
                     className="card-item wishlist"
-                    onClick={() => setSelectedEntry(entry)}
+                    onClick={() => setSelectedCard(cardGroup)}
                   >
-                    {entry.card_image ? (
-                      <img src={entry.card_image} alt={entry.card_name} loading="lazy" />
+                    {cardGroup.image ? (
+                      <img src={cardGroup.image} alt={cardGroup.name} loading="lazy" />
                     ) : (
                       <div style={{ aspectRatio: '63/88', background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                        {entry.card_name}
+                        {cardGroup.name}
                       </div>
                     )}
                     <span className="card-badge wishlist">★</span>
+                    <div className="finish-hover-panel" onClick={(e) => e.stopPropagation()}>
+                      {cardGroup.entries.map((entry) => (
+                        <div key={entry.id} className="fhp-wish-row">
+                          <span className="fhp-wish-badge">★{FINISH_LABELS_SHORT[entry.finish] ?? entry.finish}</span>
+                          <button
+                            className="fhp-remove-btn"
+                            title="Remove from wishlist"
+                            onClick={async (ev) => { ev.stopPropagation(); await handleDelete(entry.id); }}
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
                     <div className="card-item-info">
-                      <div className="card-item-name">{entry.card_name}</div>
-                      <div className="card-item-number">#{entry.card_number}</div>
+                      <div className="card-item-name">{cardGroup.name}</div>
+                      <div className="card-item-number">#{cardGroup.number}</div>
                     </div>
                   </div>
                 ))}
@@ -123,18 +160,19 @@ export default function WishlistPage() {
         </>
       )}
 
-      {selectedEntry && (
+      {selectedCard && (
         <CardModal
           card={{
-            id: selectedEntry.card_id,
-            name: selectedEntry.card_name,
-            number: selectedEntry.card_number,
-            rarity: selectedEntry.rarity,
-            images: { small: selectedEntry.card_image },
-            set: { id: selectedEntry.set_id, name: selectedEntry.set_name },
+            id: selectedCard.id,
+            name: selectedCard.name,
+            number: selectedCard.number,
+            rarity: selectedCard.rarity,
+            images: { small: selectedCard.image },
+            set: { id: selectedCard.set_id, name: selectedCard.set_name },
+            variants: variantsFromEntries(selectedCard.entries),
           }}
-          collectionEntries={[selectedEntry]}
-          onClose={() => setSelectedEntry(null)}
+          collectionEntries={selectedCard.entries}
+          onClose={() => setSelectedCard(null)}
           onSave={handleSave}
           onDelete={handleDelete}
           onAdjust={handleAdjust}
