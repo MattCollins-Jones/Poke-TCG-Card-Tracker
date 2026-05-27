@@ -17,12 +17,13 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
+  const [deleting, setDeleting] = useState(new Set());
 
   const loadWishlist = useCallback(() => {
     return apiFetch('/api/collection?wishlist=true')
       .then((r) => r.json())
       .then((rows) => { setWishlist(rows); setLoading(false); return rows; })
-      .catch(() => { setLoading(false); return []; });
+      .catch(() => { setLoading(false); return null; });
   }, []);
 
   useEffect(() => { loadWishlist(); }, [loadWishlist]);
@@ -67,13 +68,18 @@ export default function WishlistPage() {
       body: JSON.stringify(payload),
     });
     const rows = await loadWishlist();
-    syncSelectedCard(rows);
+    if (rows) syncSelectedCard(rows);
   };
 
   const handleDelete = async (id) => {
-    await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
-    const rows = await loadWishlist();
-    syncSelectedCard(rows);
+    setDeleting((s) => new Set(s).add(id));
+    try {
+      await apiFetch(`/api/collection/${id}`, { method: 'DELETE' });
+      const rows = await loadWishlist();
+      if (rows) syncSelectedCard(rows);
+    } finally {
+      setDeleting((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
   };
 
   const handleAdjust = async (entry, delta) => {
@@ -88,7 +94,7 @@ export default function WishlistPage() {
       });
     }
     const rows = await loadWishlist();
-    syncSelectedCard(rows);
+    if (rows) syncSelectedCard(rows);
   };
 
   if (loading) return <div className="loading">Loading wishlist…</div>;
@@ -146,6 +152,7 @@ export default function WishlistPage() {
                           <button
                             className="fhp-remove-btn"
                             title="Remove from wishlist"
+                            disabled={deleting.has(entry.id)}
                             onClick={async (ev) => { ev.stopPropagation(); await handleDelete(entry.id); }}
                           >✕</button>
                         </div>

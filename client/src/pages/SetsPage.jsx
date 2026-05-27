@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import CardModal from "../components/CardModal.jsx";
 import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from "../utils/finishes.js";
@@ -38,6 +38,8 @@ export default function SetsPage() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [quickAdding, setQuickAdding] = useState(new Set());
   const [ownedMapLoaded, setOwnedMapLoaded] = useState(false);
+
+  const loadingSetIds = useRef(new Set());
 
   useEffect(() => {
     apiFetch("/api/sets")
@@ -95,6 +97,8 @@ export default function SetsPage() {
   }, [debouncedSearch]);
 
   const loadSetCollection = useCallback((setId) => {
+    if (loadingSetIds.current.has(setId)) return Promise.resolve();
+    loadingSetIds.current.add(setId);
     return apiFetch(`/api/collection?set_id=${setId}`)
       .then((r) => r.json())
       .then((rows) => {
@@ -115,7 +119,8 @@ export default function SetsPage() {
           return next;
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { loadingSetIds.current.delete(setId); });
   }, []);
 
   const openCard = async (card) => { await loadSetCollection(card.set.id); setSelectedCard({ card }); };
