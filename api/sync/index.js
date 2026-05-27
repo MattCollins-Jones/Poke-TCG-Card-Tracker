@@ -145,16 +145,18 @@ export default async function handler(req, res) {
       for (let i = 0; i < sets.length; i += BATCH) {
         const rows = sets.slice(i, i + BATCH).map((s) => {
           const existing = existingImages[s.id] ?? {};
-          const row = {
+          // Always include logo/symbol columns so every row in the batch has the same
+          // shape. If some rows omit a column, PostgREST normalises the missing fields
+          // to NULL in the ON CONFLICT DO UPDATE, which would clear any existing value.
+          // Prefer the DB value (custom or previously synced); fall back to the API value.
+          return {
             id: s.id,
             name: s.name,
             total: s.cardCount?.total ?? null,
             printed_total: s.cardCount?.official ?? null,
+            logo_image:   existing.logo_image   || (s.logo   ? `${s.logo}.webp`   : null),
+            symbol_image: existing.symbol_image || (s.symbol ? `${s.symbol}.webp` : null),
           };
-          // Only set image fields if the DB doesn't already have a custom value
-          if (!existing.symbol_image && s.symbol) row.symbol_image = `${s.symbol}.webp`;
-          if (!existing.logo_image   && s.logo)   row.logo_image   = `${s.logo}.webp`;
-          return row;
         });
         const { error } = await supabase.from('sets').upsert(rows, { onConflict: 'id' });
         if (error) throw new Error(`Sets upsert: ${error.message}`);
