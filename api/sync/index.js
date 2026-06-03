@@ -244,7 +244,7 @@ export default async function handler(req, res) {
               }
               // Queue all imageless cards for a fresh individual fetch regardless
               imagelessInSet.forEach((c) => {
-                if (!pendingCardIds.includes(c.id)) pendingCardIds.push(c.id);
+                pendingCardIds.push(c.id);
                 imagelessIds.delete(c.id); // prevent duplicate queuing across sets
               });
             }
