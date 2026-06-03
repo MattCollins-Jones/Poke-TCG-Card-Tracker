@@ -185,6 +185,7 @@ export default async function handler(req, res) {
         from += PAGE;
       }
       log(`Found ${existingIds.size} cards already in DB (${imagelessIds.size} missing images).`);
+      const initialImagelessCount = imagelessIds.size;
 
       const pendingCardIds = [];
       for (let i = 0; i < sets.length; i += BATCH) {
@@ -252,7 +253,7 @@ export default async function handler(req, res) {
         await sleep(80);
       }
 
-      log(`${pendingCardIds.length} cards to sync (${existingIds.size - imagelessIds.size} with images, ${imagelessIds.size} with missing images not yet re-queued).`);
+      log(`${pendingCardIds.length} cards to sync (${existingIds.size - initialImagelessCount} with images, ${imagelessIds.size} with missing images not yet re-queued).`);
 
       // Store pending IDs and reset cursor
       await supabase.from('sync_meta').upsert([
