@@ -51,8 +51,16 @@ async function requireAdminUser(req, res) {
 export default async function handler(req, res) {
   const supabase = createServiceClient();
 
-  // ── GET: return sync status & schedule config for the admin UI ──────────
-  if (req.method === 'GET') {
+  // ── Vercel cron authentication ─────────────────────────────────────────────
+  // Vercel cron jobs make GET requests with Authorization: Bearer <CRON_SECRET>.
+  // This check must happen before the GET/POST split so the cron GET bypasses
+  // the admin-only status endpoint and falls through to the sync logic.
+  const authHeader = req.headers['authorization'];
+  const cronEnvSecret = process.env.CRON_SECRET;
+  const isScheduledRun = !!(cronEnvSecret && authHeader === `Bearer ${cronEnvSecret}`);
+
+  // ── GET (non-cron): return sync status & schedule config for the admin UI ──
+  if (req.method === 'GET' && !isScheduledRun) {
     const ok = await requireAdminUser(req, res);
     if (!ok) return;
 
@@ -69,11 +77,8 @@ export default async function handler(req, res) {
     });
   }
 
-  if (req.method !== 'POST') return res.status(405).end();
-
-  // ── Determine caller: cron job (secret header) or logged-in admin ────────
-  const cronSecret = req.headers['x-sync-secret'];
-  const isScheduledRun = !!(cronSecret && cronSecret === process.env.SYNC_SECRET);
+  // Reject anything that isn't a cron GET or a manual POST
+  if (!isScheduledRun && req.method !== 'POST') return res.status(405).end();
 
   if (isScheduledRun) {
     // Cron path: check whether today matches the configured schedule
@@ -95,7 +100,7 @@ export default async function handler(req, res) {
       return res.end();
     }
   } else {
-    // Manual path: require a logged-in admin user
+    // Manual POST: require a logged-in admin user
     const ok = await requireAdminUser(req, res);
     if (!ok) return;
   }
@@ -105,7 +110,8 @@ export default async function handler(req, res) {
   // phase=prices   → fetch next batch of ALL card IDs and update pricing columns only
   // phase=auto     → run sets phase then as many card batches as time allows (default)
   // phase=schedule → save schedule config (scheduleType, scheduleDay)
-  const phase = req.query.phase ?? 'auto';
+  // Cron runs always use phase=auto regardless of query parameter (no manual phase injection)
+  const phase = isScheduledRun ? 'auto' : (req.query.phase ?? 'auto');
   const CARD_BATCH_SIZE = 1000; // cards per invocation
 
   // ── Schedule config save ─────────────────────────────────────────────────
