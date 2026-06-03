@@ -169,18 +169,22 @@ export default async function handler(req, res) {
       }
       log(`Upserted ${sets.length} sets. Fetching set details…`);
 
-      // Fetch ALL existing card IDs — paginate because Supabase caps at 1000 rows per request
+      // Fetch ALL existing card IDs and image status — paginate because Supabase caps at 1000 rows per request
       const existingIds = new Set();
+      const imagelessIds = new Set(); // cards in DB but missing small_image
       let from = 0;
       const PAGE = 1000;
       while (true) {
-        const { data: page } = await supabase.from('cards').select('id').range(from, from + PAGE - 1);
+        const { data: page } = await supabase.from('cards').select('id, small_image').range(from, from + PAGE - 1);
         if (!page || page.length === 0) break;
-        page.forEach((c) => existingIds.add(c.id));
+        page.forEach((c) => {
+          existingIds.add(c.id);
+          if (!c.small_image) imagelessIds.add(c.id);
+        });
         if (page.length < PAGE) break;
         from += PAGE;
       }
-      log(`Found ${existingIds.size} cards already in DB.`);
+      log(`Found ${existingIds.size} cards already in DB (${imagelessIds.size} missing images).`);
 
       const pendingCardIds = [];
       for (let i = 0; i < sets.length; i += BATCH) {
@@ -203,11 +207,17 @@ export default async function handler(req, res) {
               // Insert minimal stub rows immediately so that cards which fail the
               // individual fetch (TCGdex data gaps) are still recorded in the DB
               // and won't be re-queued on every subsequent sync.
+              // Include image URLs from the set listing where available so stubs
+              // don't stay imageless if the individual card fetch fails later.
               const stubs = newCards.map((c) => ({
                 id: c.id,
                 set_id: detail.id,
                 name: c.name ?? null,
                 number: c.localId ?? null,
+                ...(c.image ? {
+                  small_image: `${c.image}/low.webp`,
+                  large_image: `${c.image}/high.webp`,
+                } : {}),
               }));
               await supabase.from('cards').upsert(stubs, { onConflict: 'id', ignoreDuplicates: true });
               newCards.forEach((c) => {
@@ -215,12 +225,34 @@ export default async function handler(req, res) {
                 pendingCardIds.push(c.id);
               });
             }
+
+            // Re-queue existing cards that are missing images so they get a fresh
+            // individual-fetch attempt (handles cards synced before TCGdex had images).
+            // Also patch the image from the set listing if it's already available there.
+            const imagelessInSet = detail.cards.filter((c) => imagelessIds.has(c.id));
+            if (imagelessInSet.length > 0) {
+              // Patch stubs with set-listing images where available
+              const withSetImage = imagelessInSet.filter((c) => c.image);
+              if (withSetImage.length > 0) {
+                const patches = withSetImage.map((c) => ({
+                  id: c.id,
+                  small_image: `${c.image}/low.webp`,
+                  large_image: `${c.image}/high.webp`,
+                }));
+                await supabase.from('cards').upsert(patches, { onConflict: 'id', ignoreDuplicates: false });
+              }
+              // Queue all imageless cards for a fresh individual fetch regardless
+              imagelessInSet.forEach((c) => {
+                if (!pendingCardIds.includes(c.id)) pendingCardIds.push(c.id);
+                imagelessIds.delete(c.id); // prevent duplicate queuing across sets
+              });
+            }
           }
         }
         await sleep(80);
       }
 
-      log(`${pendingCardIds.length} new cards to sync (${existingIds.size} already in DB).`);
+      log(`${pendingCardIds.length} cards to sync (${existingIds.size - imagelessIds.size} with images, ${imagelessIds.size} with missing images not yet re-queued).`);
 
       // Store pending IDs and reset cursor
       await supabase.from('sync_meta').upsert([
