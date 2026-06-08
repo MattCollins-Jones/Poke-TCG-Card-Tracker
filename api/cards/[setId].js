@@ -76,11 +76,23 @@ async function handleSearch(req, res, supabase) {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
-  const { setId } = req.query;
+  const { setId, rarities } = req.query;
   const supabase = createServiceClient();
 
   try {
     if (setId === 'search') return await handleSearch(req, res, supabase);
+
+    // Return distinct rarities for the set when ?rarities=1
+    if (rarities) {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('rarity')
+        .eq('set_id', setId)
+        .not('rarity', 'is', null)
+        .order('rarity');
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json([...new Set((data ?? []).map((r) => r.rarity))]);
+    }
 
     const { data: rows, error } = await supabase
       .from('cards')
