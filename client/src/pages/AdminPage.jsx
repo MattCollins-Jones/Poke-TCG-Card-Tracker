@@ -648,6 +648,7 @@ function ApiExplorer() {
   const [series, setSeries] = useState([]);
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [expandedSeries, setExpandedSeries] = useState(null);
+  const [seriesDetails, setSeriesDetails] = useState({}); // id -> { sets: [] } | 'loading' | { error }
 
   const lookup = async (type, id) => {
     const t = type || lookupType;
@@ -687,6 +688,21 @@ function ApiExplorer() {
       setError(e.message);
     }
     setSeriesLoading(false);
+  };
+
+  const expandSeries = async (seriesId) => {
+    if (expandedSeries === seriesId) { setExpandedSeries(null); return; }
+    setExpandedSeries(seriesId);
+    if (seriesDetails[seriesId]) return; // already loaded or loading
+    setSeriesDetails(prev => ({ ...prev, [seriesId]: 'loading' }));
+    try {
+      const res = await fetch(`${TCGDEX}/series/${seriesId}`);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      const data = await res.json();
+      setSeriesDetails(prev => ({ ...prev, [seriesId]: data }));
+    } catch (e) {
+      setSeriesDetails(prev => ({ ...prev, [seriesId]: { error: e.message } }));
+    }
   };
 
   const visibleCards = result?.cards?.filter(c =>
@@ -746,37 +762,48 @@ function ApiExplorer() {
       {mode === 'browse' && (
         <div>
           {seriesLoading && <p style={{ color: 'var(--text-muted)' }}>Loading series…</p>}
-          {series.map(s => (
-            <div key={s.id} style={{ marginBottom: 8, background: 'var(--surface)', borderRadius: 'var(--radius)' }}>
-              <button
-                onClick={() => setExpandedSeries(expandedSeries === s.id ? null : s.id)}
-                style={{
-                  width: '100%', textAlign: 'left', background: 'none', border: 'none',
-                  padding: '10px 14px', cursor: 'pointer', color: 'var(--text)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}
-              >
-                <span style={{ fontWeight: 600 }}>{s.name}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                  {s.sets?.length ?? 0} sets {expandedSeries === s.id ? '▴' : '▾'}
-                </span>
-              </button>
-              {expandedSeries === s.id && s.sets && (
-                <div style={{ padding: '0 14px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {s.sets.map(set => (
-                    <button
-                      key={set.id}
-                      className="btn-secondary"
-                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
-                      onClick={() => { setMode('lookup'); setLookupType('set'); setLookupId(set.id); lookup('set', set.id); }}
-                    >
-                      {set.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({set.id})</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {series.map(s => {
+            const detail = seriesDetails[s.id];
+            const sets = detail && detail !== 'loading' && !detail.error ? detail.sets ?? [] : null;
+            return (
+              <div key={s.id} style={{ marginBottom: 8, background: 'var(--surface)', borderRadius: 'var(--radius)' }}>
+                <button
+                  onClick={() => expandSeries(s.id)}
+                  style={{
+                    width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                    padding: '10px 14px', cursor: 'pointer', color: 'var(--text)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{s.name}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    {detail === 'loading' ? 'Loading…' : sets ? `${sets.length} sets` : ''}
+                    {' '}{expandedSeries === s.id ? '▴' : '▾'}
+                  </span>
+                </button>
+                {expandedSeries === s.id && (
+                  <div style={{ padding: '0 14px 10px' }}>
+                    {detail === 'loading' && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Loading sets…</span>}
+                    {detail?.error && <span style={{ color: '#e05555', fontSize: '0.8rem' }}>{detail.error}</span>}
+                    {sets && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {sets.map(set => (
+                          <button
+                            key={set.id}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                            onClick={() => { setMode('lookup'); setLookupType('set'); setLookupId(set.id); lookup('set', set.id); }}
+                          >
+                            {set.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({set.id})</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
