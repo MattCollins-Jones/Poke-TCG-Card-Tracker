@@ -28,20 +28,29 @@ export default async function handler(req, res) {
 
   // ── Card lookup ────────────────────────────────────────────────────────────
   if (cardId) {
-    const [apiRes, { data: dbRow }] = await Promise.all([
-      fetch(`${TCGDEX}/cards/${cardId}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      supabase.from('cards').select('id, set_id, name, number, rarity, subtypes, variants, small_image, large_image, hidden').eq('id', cardId).single(),
+    const [apiRes, { data: dbRow, error: dbError }] = await Promise.all([
+      fetch(`${TCGDEX}/cards/${encodeURIComponent(cardId)}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      supabase.from('cards').select('id, set_id, name, number, rarity, subtypes, variants, small_image, large_image, hidden').eq('id', cardId).maybeSingle(),
     ]);
+
+    if (dbError) {
+      return res.status(500).json({ error: `Database lookup failed for card "${cardId}": ${dbError.message}` });
+    }
+
     return res.json({ type: 'card', cardId, api: apiRes, db: dbRow ?? null });
   }
 
   // ── Set lookup ─────────────────────────────────────────────────────────────
-  const [apiRes, { data: dbCards }] = await Promise.all([
-    fetch(`${TCGDEX}/sets/${setId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+  const [apiRes, { data: dbCards, error: dbError }] = await Promise.all([
+    fetch(`${TCGDEX}/sets/${encodeURIComponent(setId)}`).then(r => r.ok ? r.json() : null).catch(() => null),
     supabase.from('cards')
       .select('id, name, number, rarity, subtypes, variants, small_image, large_image, hidden')
       .eq('set_id', setId),
   ]);
+
+  if (dbError) {
+    return res.status(500).json({ error: `Database lookup failed for set "${setId}": ${dbError.message}` });
+  }
 
   if (!apiRes && (!dbCards || dbCards.length === 0)) {
     return res.status(404).json({ error: `Set "${setId}" not found in API or DB` });

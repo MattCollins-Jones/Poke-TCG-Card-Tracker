@@ -648,7 +648,6 @@ function ApiExplorer() {
   const [series, setSeries] = useState([]);
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [expandedSeries, setExpandedSeries] = useState(null);
-  const [setCards, setSetCards] = useState({}); // setId -> result
 
   const lookup = async (type, id) => {
     const t = type || lookupType;
@@ -690,17 +689,6 @@ function ApiExplorer() {
     setSeriesLoading(false);
   };
 
-  const loadSetDetail = async (setId) => {
-    if (setCards[setId]) return;
-    setSetCards(prev => ({ ...prev, [setId]: 'loading' }));
-    try {
-      const data = await apiFetch(`/api/admin/compare?setId=${encodeURIComponent(setId)}`).then(r => r.json());
-      setSetCards(prev => ({ ...prev, [setId]: data.error ? { error: data.error } : data }));
-    } catch (e) {
-      setSetCards(prev => ({ ...prev, [setId]: { error: e.message } }));
-    }
-  };
-
   const visibleCards = result?.cards?.filter(c =>
     filter === 'all' ? true : (!c.dbExists || !c.dbHasImage || !c.dbHasFullData || c.dbHidden)
   ) ?? [];
@@ -716,12 +704,12 @@ function ApiExplorer() {
         <button
           className={`admin-tab${mode === 'lookup' ? ' active' : ''}`}
           style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-          onClick={() => setMode('lookup')}
+          onClick={() => { setMode('lookup'); setError(''); }}
         >🔍 Lookup</button>
         <button
           className={`admin-tab${mode === 'browse' ? ' active' : ''}`}
           style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-          onClick={() => { setMode('browse'); if (!series.length) loadSeries(); }}
+          onClick={() => { setMode('browse'); setError(''); if (!series.length) loadSeries(); }}
         >📚 Browse Series</button>
       </div>
 
