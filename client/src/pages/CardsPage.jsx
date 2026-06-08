@@ -90,7 +90,7 @@ export default function CardsPage() {
     // Use allSettled so a rarities or sets failure never blocks the cards grid
     Promise.allSettled([
       apiFetch(`/api/cards/${setId}`).then((r) => r.json()),
-      apiFetch(`/api/cards/rarities/${setId}`).then((r) => r.json()),
+      apiFetch(`/api/cards/${setId}?rarities=1`).then((r) => r.json()),
       apiFetch('/api/sets').then((r) => r.json()),
     ]).then(([cardsResult, raritiesResult, setsResult]) => {
       if (cardsResult.status === 'rejected' || cardsResult.value?.error) {

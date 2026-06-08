@@ -185,6 +185,8 @@ export default async function handler(req, res) {
         from += PAGE;
       }
       log(`Found ${existingIds.size} cards already in DB (${imagelessIds.size} missing images).`);
+      const initialExistingCount = existingIds.size;
+      const initialImagelessCount = imagelessIds.size;
 
       const pendingCardIds = [];
       for (let i = 0; i < sets.length; i += BATCH) {
@@ -243,7 +245,7 @@ export default async function handler(req, res) {
               }
               // Queue all imageless cards for a fresh individual fetch regardless
               imagelessInSet.forEach((c) => {
-                if (!pendingCardIds.includes(c.id)) pendingCardIds.push(c.id);
+                pendingCardIds.push(c.id);
                 imagelessIds.delete(c.id); // prevent duplicate queuing across sets
               });
             }
@@ -252,7 +254,9 @@ export default async function handler(req, res) {
         await sleep(80);
       }
 
-      log(`${pendingCardIds.length} cards to sync (${existingIds.size - imagelessIds.size} with images, ${imagelessIds.size} with missing images not yet re-queued).`);
+      const requeuedImagelessCount = initialImagelessCount - imagelessIds.size;
+      const newCardsQueuedCount = pendingCardIds.length - requeuedImagelessCount;
+      log(`${initialExistingCount} cards in DB initially, ${initialImagelessCount} without images, ${newCardsQueuedCount} new cards queued, ${requeuedImagelessCount} imageless cards re-queued.`);
 
       // Store pending IDs and reset cursor
       await supabase.from('sync_meta').upsert([

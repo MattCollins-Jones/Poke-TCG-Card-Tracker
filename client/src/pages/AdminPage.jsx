@@ -617,6 +617,357 @@ function CardsAdmin() {
   );
 }
 
+// ── API Explorer ───────────────────────────────────────────────────────────────
+
+const TCGDEX = 'https://api.tcgdex.net/v2/en';
+
+function Badge({ ok, label, neutral }) {
+  const bg = neutral ? 'rgba(255,255,255,0.1)' : ok ? 'rgba(80,200,120,0.2)' : 'rgba(220,80,80,0.2)';
+  const color = neutral ? 'var(--text-muted)' : ok ? '#5ec87a' : '#e05555';
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 7px', borderRadius: 4,
+      fontSize: '0.72rem', fontWeight: 600, background: bg, color,
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function ApiExplorer() {
+  const [mode, setMode] = useState('lookup'); // 'lookup' | 'browse'
+  const [lookupType, setLookupType] = useState('set');
+  const [lookupId, setLookupId] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showRaw, setShowRaw] = useState(false);
+  const [filter, setFilter] = useState('all'); // 'all' | 'issues'
+
+  // Browse state
+  const [series, setSeries] = useState([]);
+  const [seriesLoading, setSeriesLoading] = useState(false);
+  const [expandedSeries, setExpandedSeries] = useState(null);
+
+  const lookup = async (type, id) => {
+    const t = type || lookupType;
+    const q = (id || lookupId).trim();
+    if (!q) return;
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setShowRaw(false);
+    try {
+      if (t === 'card') {
+        const data = await apiFetch(`/api/admin/compare?cardId=${encodeURIComponent(q)}`).then(r => r.json());
+        if (data.error) throw new Error(data.error);
+        setResult(data);
+      } else if (t === 'set') {
+        const data = await apiFetch(`/api/admin/compare?setId=${encodeURIComponent(q)}`).then(r => r.json());
+        if (data.error) throw new Error(data.error);
+        setResult(data);
+      } else {
+        const res = await fetch(`${TCGDEX}/series/${q}`);
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
+        setResult({ type: 'series', data: await res.json() });
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  const loadSeries = async () => {
+    setSeriesLoading(true);
+    try {
+      const res = await fetch(`${TCGDEX}/series`);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      setSeries(await res.json());
+    } catch (e) {
+      setError(e.message);
+    }
+    setSeriesLoading(false);
+  };
+
+  const visibleCards = result?.cards?.filter(c =>
+    filter === 'all' ? true : (!c.dbExists || !c.dbHasImage || !c.dbHasFullData || c.dbHidden)
+  ) ?? [];
+
+  return (
+    <div>
+      <p style={{ color: 'var(--text-muted)', marginTop: 0, marginBottom: 18 }}>
+        Inspect TCGdex API data and compare it against the database to diagnose sync issues.
+      </p>
+
+      {/* Mode switcher */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <button
+          className={`admin-tab${mode === 'lookup' ? ' active' : ''}`}
+          style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+          onClick={() => { setMode('lookup'); setError(''); }}
+        >🔍 Lookup</button>
+        <button
+          className={`admin-tab${mode === 'browse' ? ' active' : ''}`}
+          style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+          onClick={() => { setMode('browse'); setError(''); if (!series.length) loadSeries(); }}
+        >📚 Browse Series</button>
+      </div>
+
+      {/* ── Lookup mode ── */}
+      {mode === 'lookup' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <select
+              value={lookupType}
+              onChange={e => setLookupType(e.target.value)}
+              className="admin-input"
+              style={{ width: 'auto', minWidth: 90 }}
+            >
+              <option value="set">Set</option>
+              <option value="card">Card</option>
+              <option value="series">Series</option>
+            </select>
+            <input
+              className="admin-input"
+              style={{ flex: 1, minWidth: 160 }}
+              value={lookupId}
+              onChange={e => setLookupId(e.target.value)}
+              placeholder={lookupType === 'set' ? 'e.g. me04' : lookupType === 'card' ? 'e.g. me04-001' : 'e.g. me'}
+              onKeyDown={e => e.key === 'Enter' && lookup()}
+            />
+            <button className="btn-primary" onClick={() => lookup()} disabled={loading || !lookupId.trim()}>
+              {loading ? 'Loading…' : 'Lookup'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Browse mode ── */}
+      {mode === 'browse' && (
+        <div>
+          {seriesLoading && <p style={{ color: 'var(--text-muted)' }}>Loading series…</p>}
+          {series.map(s => (
+            <div key={s.id} style={{ marginBottom: 8, background: 'var(--surface)', borderRadius: 'var(--radius)' }}>
+              <button
+                onClick={() => setExpandedSeries(expandedSeries === s.id ? null : s.id)}
+                style={{
+                  width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                  padding: '10px 14px', cursor: 'pointer', color: 'var(--text)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>{s.name}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  {s.sets?.length ?? 0} sets {expandedSeries === s.id ? '▴' : '▾'}
+                </span>
+              </button>
+              {expandedSeries === s.id && s.sets && (
+                <div style={{ padding: '0 14px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {s.sets.map(set => (
+                    <button
+                      key={set.id}
+                      className="btn-secondary"
+                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                      onClick={() => { setMode('lookup'); setLookupType('set'); setLookupId(set.id); lookup('set', set.id); }}
+                    >
+                      {set.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({set.id})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <div style={{ color: '#e05555', background: 'rgba(220,80,80,0.1)', padding: '10px 14px', borderRadius: 'var(--radius)', marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      {result && (
+        <div style={{ marginTop: 16 }}>
+
+          {/* Set result */}
+          {result.type === 'set' && (
+            <>
+              <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '14px 18px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: 4 }}>
+                      {result.apiSet?.name ?? result.setId}
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.85rem', marginLeft: 8 }}>{result.setId}</span>
+                    </div>
+                    {result.apiSet?.releaseDate && (
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Released: {result.apiSet.releaseDate}</div>
+                    )}
+                    {result.apiSet?.serie && (
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Series: {result.apiSet.serie.name}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {[
+                      { label: `API: ${result.summary.apiTotal} cards`, ok: true },
+                      { label: `DB: ${result.summary.dbTotal} total`, ok: result.summary.dbTotal > 0 },
+                      { label: `${result.summary.dbVisible} visible`, ok: result.summary.dbVisible > 0 },
+                      result.summary.dbHidden > 0 && { label: `${result.summary.dbHidden} hidden`, neutral: true },
+                      result.summary.missingFromDb > 0 && { label: `${result.summary.missingFromDb} not in DB`, ok: false },
+                      result.summary.missingImage > 0 && { label: `${result.summary.missingImage} no image`, ok: false },
+                      result.summary.missingFullData > 0 && { label: `${result.summary.missingFullData} no rarity`, ok: false },
+                      result.summary.dbOnly > 0 && { label: `${result.summary.dbOnly} DB-only`, neutral: true },
+                    ].filter(Boolean).map((b, i) => <Badge key={i} {...b} />)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter + table */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                <button
+                  className={`admin-tab${filter === 'all' ? ' active' : ''}`}
+                  style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                  onClick={() => setFilter('all')}
+                >All ({result.cards.length})</button>
+                <button
+                  className={`admin-tab${filter === 'issues' ? ' active' : ''}`}
+                  style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                  onClick={() => setFilter('issues')}
+                >Issues only ({result.cards.filter(c => !c.dbExists || !c.dbHasImage || !c.dbHasFullData || c.dbHidden).length})</button>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '4px 10px', marginLeft: 'auto' }}
+                  onClick={() => setShowRaw(r => !r)}
+                >{showRaw ? 'Hide' : 'Show'} raw JSON</button>
+              </div>
+
+              {!showRaw && (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>API image</th>
+                        <th>In DB</th>
+                        <th>DB image</th>
+                        <th>Full data</th>
+                        <th>Hidden</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleCards.map(c => (
+                        <tr key={c.id}>
+                          <td style={{ color: 'var(--text-muted)' }}>{c.number}</td>
+                          <td>
+                            <button
+                              style={{ background: 'none', border: 'none', color: 'var(--yellow)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                              onClick={() => { setLookupType('card'); setLookupId(c.id); lookup('card', c.id); }}
+                            >{c.id}</button>
+                          </td>
+                          <td>{c.name}</td>
+                          <td>{c.apiHasImage === null ? <Badge label="N/A" neutral /> : <Badge ok={c.apiHasImage} label={c.apiHasImage ? '✓' : '✗'} />}</td>
+                          <td><Badge ok={c.dbExists} label={c.dbExists ? '✓' : '✗'} /></td>
+                          <td><Badge ok={c.dbHasImage} label={c.dbHasImage ? '✓' : '✗'} /></td>
+                          <td><Badge ok={c.dbHasFullData} label={c.dbHasFullData ? '✓' : '✗'} /></td>
+                          <td>{c.dbHidden === null ? <Badge label="N/A" neutral /> : <Badge ok={!c.dbHidden} label={c.dbHidden ? 'Hidden' : 'Visible'} />}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Card result */}
+          {result.type === 'card' && (
+            <div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{result.api?.name ?? result.cardId}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{result.cardId}</span>
+                <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                  <Badge ok={!!result.api} label={result.api ? 'In API' : 'Not in API'} />
+                  <Badge ok={!!result.db} label={result.db ? 'In DB' : 'Not in DB'} />
+                  {result.db && <Badge ok={!!result.db.small_image} label={result.db.small_image ? 'Has image' : 'No image'} />}
+                  {result.db && <Badge ok={!result.db.hidden} label={result.db.hidden ? 'Hidden' : 'Visible'} />}
+                </div>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '4px 10px', marginLeft: 'auto' }}
+                  onClick={() => setShowRaw(r => !r)}
+                >{showRaw ? 'Hide' : 'Show'} raw JSON</button>
+              </div>
+
+              {result.api?.image && (
+                <div style={{ marginBottom: 12 }}>
+                  <img
+                    src={`${result.api.image}/low.webp`}
+                    alt={result.api.name}
+                    style={{ height: 140, borderRadius: 8, objectFit: 'contain' }}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)', fontSize: '0.8rem' }}>TCGdex API</div>
+                  {result.api ? (
+                    <pre style={{ margin: 0, fontSize: '0.72rem', overflow: 'auto', maxHeight: 300, color: 'var(--text)' }}>
+                      {JSON.stringify(result.api, null, 2)}
+                    </pre>
+                  ) : (
+                    <span style={{ color: '#e05555' }}>Not found in API</span>
+                  )}
+                </div>
+                <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)', fontSize: '0.8rem' }}>Database</div>
+                  {result.db ? (
+                    <pre style={{ margin: 0, fontSize: '0.72rem', overflow: 'auto', maxHeight: 300, color: 'var(--text)' }}>
+                      {JSON.stringify(result.db, null, 2)}
+                    </pre>
+                  ) : (
+                    <span style={{ color: '#e05555' }}>Not found in DB</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Series result */}
+          {result.type === 'series' && (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: 12 }}>{result.data.name}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {result.data.sets?.map(s => (
+                  <button
+                    key={s.id}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                    onClick={() => { setLookupType('set'); setLookupId(s.id); lookup('set', s.id); }}
+                  >
+                    {s.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({s.id})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showRaw && (
+            <pre style={{
+              marginTop: 16, padding: 14, background: 'var(--surface)', borderRadius: 'var(--radius)',
+              fontSize: '0.72rem', overflow: 'auto', maxHeight: 500, color: 'var(--text)',
+            }}>
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Admin Page ─────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -634,9 +985,15 @@ export default function AdminPage() {
           className={`admin-tab${tab === 'cards' ? ' active' : ''}`}
           onClick={() => setTab('cards')}
         >Cards</button>
+        <button
+          className={`admin-tab${tab === 'api' ? ' active' : ''}`}
+          onClick={() => setTab('api')}
+        >🔍 API Explorer</button>
       </div>
       <div style={{ marginTop: 20 }}>
-        {tab === 'sets' ? <SetsAdmin /> : <CardsAdmin />}
+        {tab === 'sets' && <SetsAdmin />}
+        {tab === 'cards' && <CardsAdmin />}
+        {tab === 'api' && <ApiExplorer />}
       </div>
     </div>
   );
