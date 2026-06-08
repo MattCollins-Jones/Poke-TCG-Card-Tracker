@@ -668,7 +668,7 @@ function ApiExplorer() {
         if (data.error) throw new Error(data.error);
         setResult(data);
       } else {
-        const res = await fetch(`${TCGDEX}/series/${q}`);
+        const res = await fetch(`${TCGDEX}/series/${encodeURIComponent(q)}`);
         if (!res.ok) throw new Error(`API returned ${res.status}`);
         setResult({ type: 'series', data: await res.json() });
       }
@@ -693,7 +693,7 @@ function ApiExplorer() {
   const expandSeries = async (seriesId) => {
     if (expandedSeries === seriesId) { setExpandedSeries(null); return; }
     setExpandedSeries(seriesId);
-    if (seriesDetails[seriesId]) return; // already loaded or loading
+    if (seriesDetails[seriesId] && seriesDetails[seriesId] !== 'loading' && !seriesDetails[seriesId].error) return;
     setSeriesDetails(prev => ({ ...prev, [seriesId]: 'loading' }));
     try {
       const res = await fetch(`${TCGDEX}/series/${seriesId}`);
@@ -769,6 +769,7 @@ function ApiExplorer() {
               <div key={s.id} style={{ marginBottom: 8, background: 'var(--surface)', borderRadius: 'var(--radius)' }}>
                 <button
                   onClick={() => expandSeries(s.id)}
+                  aria-expanded={expandedSeries === s.id}
                   style={{
                     width: '100%', textAlign: 'left', background: 'none', border: 'none',
                     padding: '10px 14px', cursor: 'pointer', color: 'var(--text)',
