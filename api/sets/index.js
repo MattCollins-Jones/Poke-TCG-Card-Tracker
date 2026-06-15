@@ -1,4 +1,4 @@
-import { createServiceClient } from '../lib/supabase.js';
+import { createServiceClient } from '../_lib/supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -32,3 +32,4 @@ export default async function handler(req, res) {
 
   res.json({ data });
 }
+

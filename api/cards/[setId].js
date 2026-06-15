@@ -1,4 +1,4 @@
-import { createServiceClient } from '../lib/supabase.js';
+import { createServiceClient } from '../_lib/supabase.js';
 
 function shapeCard(c, setMap) {
   const setInfo = setMap ? (setMap[c.set_id] ?? {}) : null;
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
     if (setId === 'search') return await handleSearch(req, res, supabase);
 
     // Return distinct rarities for the set when ?rarities=1
-    if (rarities) {
+    if (rarities === '1') {
       const { data, error } = await supabase
         .from('cards')
         .select('rarity')
@@ -118,3 +118,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
+

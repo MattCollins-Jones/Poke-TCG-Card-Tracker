@@ -1,4 +1,4 @@
-import { getUser } from '../lib/supabase.js';
+import { getUser } from '../_lib/supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -10,3 +10,4 @@ export default async function handler(req, res) {
 
   res.json({ isAdmin });
 }
+
