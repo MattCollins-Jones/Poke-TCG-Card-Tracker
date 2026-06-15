@@ -1,4 +1,4 @@
-import { createServiceClient } from '../lib/supabase.js';
+import { createServiceClient } from '../_lib/supabase.js';
 
 function shapeCard(c, setMap) {
   const setInfo = setMap ? (setMap[c.set_id] ?? {}) : null;
@@ -118,3 +118,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
+

@@ -1,4 +1,4 @@
-import { createServiceClient, getUser } from '../lib/supabase.js';
+import { createServiceClient, getUser } from '../_lib/supabase.js';
 
 const BUCKET = 'pokemon-images';
 
@@ -32,3 +32,4 @@ export default async function handler(req, res) {
 
   res.json({ signedUrl: data.signedUrl, path: data.path, token: data.token, publicUrl });
 }
+

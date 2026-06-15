@@ -1,4 +1,4 @@
-import { createServiceClient, getUser } from '../lib/supabase.js';
+import { createServiceClient, getUser } from '../_lib/supabase.js';
 
 const API = 'https://api.tcgdex.net/v2/en';
 const BATCH = 20;
@@ -431,4 +431,5 @@ export default async function handler(req, res) {
     res.end();
   }
 }
+
 

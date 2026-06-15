@@ -1,4 +1,4 @@
-import { createServiceClient, getUser } from '../../lib/supabase.js';
+import { createServiceClient, getUser } from '../../_lib/supabase.js';
 
 async function requireAdmin(req, res) {
   const user = await getUser(req);
@@ -67,3 +67,4 @@ export default async function handler(req, res) {
 
   res.status(405).end();
 }
+
