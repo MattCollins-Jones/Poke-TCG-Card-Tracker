@@ -80,38 +80,40 @@ export default async function handler(req, res) {
   // Reject anything that isn't a cron GET or a manual POST
   if (!isScheduledRun && req.method !== 'POST') return res.status(405).end();
 
+  // phase=sets     → sync sets list + collect all card IDs, store pending IDs in sync_meta
+  // phase=cards    → fetch next batch of pending card IDs from sync_meta, upsert, advance cursor
+  // phase=prices   → fetch next batch of ALL card IDs and update pricing columns only
+  // phase=auto     → run sets phase then card batch (default for cron and manual)
+  // phase=schedule → save schedule config (scheduleType, scheduleDay)
+  const phase = req.query.phase ?? 'auto';
+
   if (isScheduledRun) {
-    // Cron path: check whether today matches the configured schedule
-    const { data: schedRows } = await supabase.from('sync_meta').select('key, value')
-      .in('key', ['schedule_type', 'schedule_day']);
-    const schedMeta = Object.fromEntries((schedRows ?? []).map((r) => [r.key, r.value]));
-    const scheduleType = schedMeta.schedule_type ?? 'monthly';
-    const scheduleDay  = parseInt(schedMeta.schedule_day ?? '1', 10);
+    // Prices cron (phase=prices) always runs — the cron schedule controls the cadence.
+    // Auto/sets/cards cron checks the user-configured schedule day before running.
+    if (phase !== 'prices') {
+      const { data: schedRows } = await supabase.from('sync_meta').select('key, value')
+        .in('key', ['schedule_type', 'schedule_day']);
+      const schedMeta = Object.fromEntries((schedRows ?? []).map((r) => [r.key, r.value]));
+      const scheduleType = schedMeta.schedule_type ?? 'monthly';
+      const scheduleDay  = parseInt(schedMeta.schedule_day ?? '1', 10);
 
-    const now = new Date();
-    let shouldRun = false;
-    if (scheduleType === 'weekly')       shouldRun = now.getUTCDay()  === scheduleDay;
-    else if (scheduleType === 'monthly') shouldRun = now.getUTCDate() === scheduleDay;
-    // 'manual_only' → never auto-run
+      const now = new Date();
+      let shouldRun = false;
+      if (scheduleType === 'weekly')       shouldRun = now.getUTCDay()  === scheduleDay;
+      else if (scheduleType === 'monthly') shouldRun = now.getUTCDate() === scheduleDay;
+      // 'manual_only' → never auto-run
 
-    if (!shouldRun) {
-      res.setHeader('Content-Type', 'text/plain');
-      res.write('Scheduled check — not sync day. Skipping.\n');
-      return res.end();
+      if (!shouldRun) {
+        res.setHeader('Content-Type', 'text/plain');
+        res.write('Scheduled check — not sync day. Skipping.\n');
+        return res.end();
+      }
     }
   } else {
     // Manual POST: require a logged-in admin user
     const ok = await requireAdminUser(req, res);
     if (!ok) return;
   }
-
-  // phase=sets     → sync sets list + collect all card IDs, store pending IDs in sync_meta
-  // phase=cards    → fetch next batch of pending card IDs from sync_meta, upsert, advance cursor
-  // phase=prices   → fetch next batch of ALL card IDs and update pricing columns only
-  // phase=auto     → run sets phase then as many card batches as time allows (default)
-  // phase=schedule → save schedule config (scheduleType, scheduleDay)
-  // Cron runs always use phase=auto regardless of query parameter (no manual phase injection)
-  const phase = isScheduledRun ? 'auto' : (req.query.phase ?? 'auto');
   const CARD_BATCH_SIZE = 1000; // cards per invocation
 
   // ── Schedule config save ─────────────────────────────────────────────────
