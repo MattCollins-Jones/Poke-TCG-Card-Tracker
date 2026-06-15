@@ -342,7 +342,8 @@ export default async function handler(req, res) {
       res.end();
     }
     // Prices phase — fetch pricing for all cards in batches, update price columns only
-    if (phase === 'prices') {
+    // Also runs automatically on every scheduled cron (one cursor-batch per run keeps prices rotating)
+    if (phase === 'prices' || (isScheduledRun && phase === 'auto')) {
       // Load cursor from sync_meta
       const { data: metaRows } = await supabase
         .from('sync_meta')
