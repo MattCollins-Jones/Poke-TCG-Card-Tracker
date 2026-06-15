@@ -285,6 +285,13 @@ export default async function handler(req, res) {
 
       if (pendingCardIds.length === 0) {
         log('No pending cards — already up to date!');
+        // Still record the run timestamp so the admin UI reflects the last check
+        if (isScheduledRun) {
+          await supabase.from('sync_meta').upsert([
+            { key: 'last_sync',      value: new Date().toISOString() },
+            { key: 'last_sync_type', value: 'scheduled' },
+          ], { onConflict: 'key' });
+        }
         return res.end();
       }
 
