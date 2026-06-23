@@ -670,14 +670,12 @@ function ApiExplorer() {
     setShowRaw(false);
     try {
       if (t === 'card') {
-        const url = `${window.location.origin}/api/admin/compare?cardId=${encodeURIComponent(q)}`;
-        setLastUrl(url);
+        setLastUrl(`${TCGDEX}/cards/${encodeURIComponent(q)}`);
         const data = await apiFetch(`/api/admin/compare?cardId=${encodeURIComponent(q)}`).then(r => r.json());
         if (data.error) throw new Error(data.error);
         setResult(data);
       } else if (t === 'set') {
-        const url = `${window.location.origin}/api/admin/compare?setId=${encodeURIComponent(q)}`;
-        setLastUrl(url);
+        setLastUrl(`${TCGDEX}/sets/${encodeURIComponent(q)}`);
         const data = await apiFetch(`/api/admin/compare?setId=${encodeURIComponent(q)}`).then(r => r.json());
         if (data.error) throw new Error(data.error);
         setResult(data);
