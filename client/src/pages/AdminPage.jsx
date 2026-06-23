@@ -643,12 +643,22 @@ function ApiExplorer() {
   const [error, setError] = useState('');
   const [showRaw, setShowRaw] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' | 'issues'
+  const [lastUrl, setLastUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
   // Browse state
   const [series, setSeries] = useState([]);
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [expandedSeries, setExpandedSeries] = useState(null);
   const [seriesDetails, setSeriesDetails] = useState({}); // id -> { sets: [] } | 'loading' | { error }
+
+  const copyUrl = () => {
+    if (!lastUrl) return;
+    navigator.clipboard.writeText(lastUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const lookup = async (type, id) => {
     const t = type || lookupType;
@@ -660,15 +670,21 @@ function ApiExplorer() {
     setShowRaw(false);
     try {
       if (t === 'card') {
+        const url = `${window.location.origin}/api/admin/compare?cardId=${encodeURIComponent(q)}`;
+        setLastUrl(url);
         const data = await apiFetch(`/api/admin/compare?cardId=${encodeURIComponent(q)}`).then(r => r.json());
         if (data.error) throw new Error(data.error);
         setResult(data);
       } else if (t === 'set') {
+        const url = `${window.location.origin}/api/admin/compare?setId=${encodeURIComponent(q)}`;
+        setLastUrl(url);
         const data = await apiFetch(`/api/admin/compare?setId=${encodeURIComponent(q)}`).then(r => r.json());
         if (data.error) throw new Error(data.error);
         setResult(data);
       } else {
-        const res = await fetch(`${TCGDEX}/series/${encodeURIComponent(q)}`);
+        const url = `${TCGDEX}/series/${encodeURIComponent(q)}`;
+        setLastUrl(url);
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`API returned ${res.status}`);
         setResult({ type: 'series', data: await res.json() });
       }
@@ -680,6 +696,7 @@ function ApiExplorer() {
 
   const loadSeries = async () => {
     setSeriesLoading(true);
+    setLastUrl(`${TCGDEX}/series`);
     try {
       const res = await fetch(`${TCGDEX}/series`);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
@@ -693,6 +710,7 @@ function ApiExplorer() {
   const expandSeries = async (seriesId) => {
     if (expandedSeries === seriesId) { setExpandedSeries(null); return; }
     setExpandedSeries(seriesId);
+    setLastUrl(`${TCGDEX}/series/${seriesId}`);
     if (seriesDetails[seriesId] && seriesDetails[seriesId] !== 'loading' && !seriesDetails[seriesId].error) return;
     setSeriesDetails(prev => ({ ...prev, [seriesId]: 'loading' }));
     try {
@@ -811,6 +829,33 @@ function ApiExplorer() {
       {error && (
         <div style={{ color: '#e05555', background: 'rgba(220,80,80,0.1)', padding: '10px 14px', borderRadius: 'var(--radius)', marginBottom: 16 }}>
           {error}
+        </div>
+      )}
+
+      {/* ── URL bar ── */}
+      {lastUrl && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--surface)', borderRadius: 'var(--radius)',
+          padding: '8px 12px', marginBottom: 16, flexWrap: 'wrap',
+        }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>URL</span>
+          <code style={{
+            flex: 1, fontSize: '0.78rem', color: 'var(--text)',
+            wordBreak: 'break-all', background: 'none', padding: 0,
+          }}>{lastUrl}</code>
+          <button
+            onClick={copyUrl}
+            style={{
+              padding: '4px 10px', fontSize: '0.78rem', cursor: 'pointer',
+              background: copied ? 'var(--primary)' : 'var(--surface-2, var(--surface))',
+              color: copied ? '#fff' : 'var(--text)',
+              border: '1px solid var(--border, #444)', borderRadius: 'var(--radius)',
+              whiteSpace: 'nowrap', transition: 'background 0.2s',
+            }}
+          >
+            {copied ? '✓ Copied' : '📋 Copy'}
+          </button>
         </div>
       )}
 
