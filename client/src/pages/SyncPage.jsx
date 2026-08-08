@@ -15,7 +15,7 @@ function timeAgo(isoStr) {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
-function SyncStatus({ lastSync, lastSyncType, lastPriceSync, lastPriceSyncType }) {
+function SyncStatus({ lastSync, lastSyncType, lastPriceSync, lastPriceSyncType, lastCronAttempt, lastCronResult }) {
   return (
     <div style={{
       background: 'var(--surface)', borderRadius: 'var(--radius)',
@@ -41,6 +41,26 @@ function SyncStatus({ lastSync, lastSyncType, lastPriceSync, lastPriceSyncType }
         {lastPriceSync && (
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {new Date(lastPriceSync).toLocaleString()} · {lastPriceSyncType}
+          </div>
+        )}
+      </div>
+      <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--surface2)', paddingTop: 10, marginTop: 4 }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 3 }}>Last cron invocation</div>
+        {lastCronAttempt ? (
+          <>
+            <div style={{ fontWeight: 600 }}>{timeAgo(lastCronAttempt)}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {new Date(lastCronAttempt).toLocaleString()}
+            </div>
+            {lastCronResult && (
+              <div style={{ fontSize: '0.75rem', marginTop: 3, color: lastCronResult.startsWith('running') ? '#4caf50' : lastCronResult.startsWith('skipped') ? 'var(--text-muted)' : 'var(--yellow)' }}>
+                {lastCronResult}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: '0.875rem', color: 'var(--yellow)' }}>
+            ⚠ No cron invocation recorded — Vercel may not be firing the cron, or this is the first deployment with tracking.
           </div>
         )}
       </div>
@@ -203,6 +223,8 @@ export default function SyncPage() {
           lastSyncType={status.lastSyncType}
           lastPriceSync={status.lastPriceSync}
           lastPriceSyncType={status.lastPriceSyncType}
+          lastCronAttempt={status.lastCronAttempt}
+          lastCronResult={status.lastCronResult}
         />
       )}
 
