@@ -90,12 +90,15 @@ export default async function handler(req, res) {
   const phase = req.query.phase ?? 'auto';
 
   if (isScheduledRun) {
-    // Record every cron invocation so the admin UI can show whether Vercel is firing the cron at all
+    // Record every cron invocation so the admin UI can show whether Vercel is firing the cron at all.
+    // Wrapped in try-catch so a transient Supabase error never prevents the actual sync from running.
     const cronAttemptTime = new Date().toISOString();
-    await supabase.from('sync_meta').upsert(
-      { key: 'last_cron_attempt', value: cronAttemptTime },
-      { onConflict: 'key' }
-    );
+    try {
+      await supabase.from('sync_meta').upsert(
+        { key: 'last_cron_attempt', value: cronAttemptTime },
+        { onConflict: 'key' }
+      );
+    } catch {}
 
     // Prices cron (phase=prices) always runs — the cron schedule controls the cadence.
     // Auto/sets/cards cron checks the user-configured schedule day before running.
@@ -113,10 +116,12 @@ export default async function handler(req, res) {
       // 'manual_only' → never auto-run
 
       if (!shouldRun) {
-        await supabase.from('sync_meta').upsert(
-          { key: 'last_cron_result', value: `skipped — not sync day (${scheduleType}/${scheduleDay}, UTC day ${new Date().getUTCDay()}, UTC date ${new Date().getUTCDate()})` },
-          { onConflict: 'key' }
-        );
+        try {
+          await supabase.from('sync_meta').upsert(
+            { key: 'last_cron_result', value: `skipped — not sync day (${scheduleType}/${scheduleDay}, UTC day ${now.getUTCDay()}, UTC date ${now.getUTCDate()})` },
+            { onConflict: 'key' }
+          );
+        } catch {}
         res.setHeader('Content-Type', 'text/plain');
         res.write('Scheduled check — not sync day. Skipping.\n');
         return res.end();
@@ -131,10 +136,12 @@ export default async function handler(req, res) {
 
   // Record that this cron run is proceeding to actual sync work
   if (isScheduledRun) {
-    await supabase.from('sync_meta').upsert(
-      { key: 'last_cron_result', value: `running — sync day matched, proceeding with phase=${phase}` },
-      { onConflict: 'key' }
-    );
+    try {
+      await supabase.from('sync_meta').upsert(
+        { key: 'last_cron_result', value: `running — sync day matched, proceeding with phase=${phase}` },
+        { onConflict: 'key' }
+      );
+    } catch {}
   }
 
   // ── Schedule config save ─────────────────────────────────────────────────
@@ -442,6 +449,15 @@ export default async function handler(req, res) {
         log(`Batch complete. ${remaining} cards remaining — click "Continue Prices" to sync next batch.`);
       }
 
+      if (isScheduledRun) {
+        try {
+          await supabase.from('sync_meta').upsert(
+            { key: 'last_cron_result', value: remaining <= 0 ? 'completed — full price cycle done' : `completed — price batch done, ${remaining} remaining` },
+            { onConflict: 'key' }
+          );
+        } catch {}
+      }
+
       return res.end();
     }
 
@@ -449,6 +465,14 @@ export default async function handler(req, res) {
     const cause = err?.cause;
     const detail = cause?.message ?? cause?.code ?? err.message ?? 'unknown error';
     log(`Error: ${detail}`);
+    if (isScheduledRun) {
+      try {
+        await supabase.from('sync_meta').upsert(
+          { key: 'last_cron_result', value: `error — ${detail}` },
+          { onConflict: 'key' }
+        );
+      } catch {}
+    }
     res.end();
   }
 }
