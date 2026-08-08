@@ -68,12 +68,14 @@ export default async function handler(req, res) {
     const meta = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
 
     return res.json({
-      lastSync:          meta.last_sync           ?? null,
-      lastSyncType:      meta.last_sync_type       ?? 'manual',
-      lastPriceSync:     meta.last_price_sync      ?? null,
-      lastPriceSyncType: meta.last_price_sync_type ?? 'manual',
-      scheduleType:      meta.schedule_type        ?? 'monthly',
+      lastSync:          meta.last_sync              ?? null,
+      lastSyncType:      meta.last_sync_type          ?? 'manual',
+      lastPriceSync:     meta.last_price_sync         ?? null,
+      lastPriceSyncType: meta.last_price_sync_type    ?? 'manual',
+      scheduleType:      meta.schedule_type           ?? 'monthly',
       scheduleDay:       parseInt(meta.schedule_day ?? '1', 10),
+      lastCronAttempt:   meta.last_cron_attempt       ?? null,
+      lastCronResult:    meta.last_cron_result        ?? null,
     });
   }
 
@@ -88,6 +90,13 @@ export default async function handler(req, res) {
   const phase = req.query.phase ?? 'auto';
 
   if (isScheduledRun) {
+    // Record every cron invocation so the admin UI can show whether Vercel is firing the cron at all
+    const cronAttemptTime = new Date().toISOString();
+    await supabase.from('sync_meta').upsert(
+      { key: 'last_cron_attempt', value: cronAttemptTime },
+      { onConflict: 'key' }
+    );
+
     // Prices cron (phase=prices) always runs — the cron schedule controls the cadence.
     // Auto/sets/cards cron checks the user-configured schedule day before running.
     if (phase !== 'prices') {
@@ -104,6 +113,10 @@ export default async function handler(req, res) {
       // 'manual_only' → never auto-run
 
       if (!shouldRun) {
+        await supabase.from('sync_meta').upsert(
+          { key: 'last_cron_result', value: `skipped — not sync day (${scheduleType}/${scheduleDay}, UTC day ${new Date().getUTCDay()}, UTC date ${new Date().getUTCDate()})` },
+          { onConflict: 'key' }
+        );
         res.setHeader('Content-Type', 'text/plain');
         res.write('Scheduled check — not sync day. Skipping.\n');
         return res.end();
@@ -115,6 +128,14 @@ export default async function handler(req, res) {
     if (!ok) return;
   }
   const CARD_BATCH_SIZE = 1000; // cards per invocation
+
+  // Record that this cron run is proceeding to actual sync work
+  if (isScheduledRun) {
+    await supabase.from('sync_meta').upsert(
+      { key: 'last_cron_result', value: `running — sync day matched, proceeding with phase=${phase}` },
+      { onConflict: 'key' }
+    );
+  }
 
   // ── Schedule config save ─────────────────────────────────────────────────
   if (phase === 'schedule') {
