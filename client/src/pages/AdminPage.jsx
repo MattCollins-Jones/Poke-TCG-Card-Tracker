@@ -654,10 +654,11 @@ function ApiExplorer() {
 
   const copyUrl = () => {
     if (!lastUrl) return;
+    if (!navigator.clipboard) { alert('Clipboard not available (requires HTTPS)'); return; }
     navigator.clipboard.writeText(lastUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }).catch(() => { alert('Failed to copy URL to clipboard'); });
   };
 
   const lookup = async (type, id) => {
