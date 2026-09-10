@@ -133,6 +133,9 @@ export default async function handler(req, res) {
     if (!ok) return;
   }
   const CARD_BATCH_SIZE = 1000; // cards per invocation
+  // Sets released within this window get all their cards re-fetched on every sync,
+  // because TCGdex often publishes new sets with incomplete variant/rarity data.
+  const RECENT_SET_DAYS = 365;
 
   // Record that this cron run is proceeding to actual sync work
   if (isScheduledRun) {
@@ -219,6 +222,9 @@ export default async function handler(req, res) {
       const initialImagelessCount = imagelessIds.size;
 
       const pendingCardIds = [];
+      const queuedIds = new Set();
+      let refreshedRecentCount = 0;
+      const recentCutoff = Date.now() - RECENT_SET_DAYS * 24 * 60 * 60 * 1000;
       for (let i = 0; i < sets.length; i += BATCH) {
         const batch = sets.slice(i, i + BATCH);
         const details = await fetchBatch(batch.map((s) => `${API}/sets/${s.id}`));
@@ -254,7 +260,21 @@ export default async function handler(req, res) {
               await supabase.from('cards').upsert(stubs, { onConflict: 'id', ignoreDuplicates: true });
               newCards.forEach((c) => {
                 existingIds.add(c.id); // prevent duplicate queuing within this run
+                queuedIds.add(c.id);
                 pendingCardIds.push(c.id);
+              });
+            }
+
+            // Re-fetch every card in recently released sets so variant/rarity data
+            // that TCGdex fills in after launch (e.g. reverse holo flags) gets picked up.
+            const releaseTime = detail.releaseDate ? new Date(detail.releaseDate).getTime() : NaN;
+            if (!isNaN(releaseTime) && releaseTime >= recentCutoff) {
+              detail.cards.forEach((c) => {
+                if (queuedIds.has(c.id)) return;
+                queuedIds.add(c.id);
+                pendingCardIds.push(c.id);
+                if (imagelessIds.has(c.id)) imagelessIds.delete(c.id); // counted as imageless re-queue
+                else refreshedRecentCount++;
               });
             }
 
@@ -275,7 +295,10 @@ export default async function handler(req, res) {
               }
               // Queue all imageless cards for a fresh individual fetch regardless
               imagelessInSet.forEach((c) => {
-                pendingCardIds.push(c.id);
+                if (!queuedIds.has(c.id)) {
+                  queuedIds.add(c.id);
+                  pendingCardIds.push(c.id);
+                }
                 imagelessIds.delete(c.id); // prevent duplicate queuing across sets
               });
             }
@@ -285,8 +308,8 @@ export default async function handler(req, res) {
       }
 
       const requeuedImagelessCount = initialImagelessCount - imagelessIds.size;
-      const newCardsQueuedCount = pendingCardIds.length - requeuedImagelessCount;
-      log(`${initialExistingCount} cards in DB initially, ${initialImagelessCount} without images, ${newCardsQueuedCount} new cards queued, ${requeuedImagelessCount} imageless cards re-queued.`);
+      const newCardsQueuedCount = pendingCardIds.length - requeuedImagelessCount - refreshedRecentCount;
+      log(`${initialExistingCount} cards in DB initially, ${initialImagelessCount} without images, ${newCardsQueuedCount} new cards queued, ${requeuedImagelessCount} imageless cards re-queued, ${refreshedRecentCount} cards from recent sets (last ${RECENT_SET_DAYS} days) queued for refresh.`);
 
       // Store pending IDs and reset cursor
       await supabase.from('sync_meta').upsert([
