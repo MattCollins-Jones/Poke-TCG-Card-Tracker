@@ -33,6 +33,22 @@ router.get('/rarities/:setId', (req, res) => {
   res.json(rows.map((r) => r.rarity));
 });
 
+// GET /api/cards/search?q=... — search cards by name
+router.get('/search', (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) {
+    return res.json({ data: [] });
+  }
+  const searchTerm = `%${q}%`;
+  const rows = db.prepare(`
+    SELECT * FROM cards 
+    WHERE name LIKE ? 
+    ORDER BY name, CAST(number AS INTEGER), number
+    LIMIT 100
+  `).all(searchTerm);
+  res.json({ data: rows.map(shapeCard) });
+});
+
 router.get('/:cardId', (req, res) => {
   const c = db.prepare(`SELECT * FROM cards WHERE id = ?`).get(req.params.cardId);
   if (!c) return res.status(404).json({ error: 'Card not found' });
