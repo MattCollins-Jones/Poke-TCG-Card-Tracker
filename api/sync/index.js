@@ -135,7 +135,7 @@ export default async function handler(req, res) {
   const CARD_BATCH_SIZE = 1000; // cards per invocation
   // Sets released within this window get all their cards re-fetched on every sync,
   // because TCGdex often publishes new sets with incomplete variant/rarity data.
-  const RECENT_SET_DAYS = 90;
+  const RECENT_SET_DAYS = 365;
 
   // Record that this cron run is proceeding to actual sync work
   if (isScheduledRun) {
