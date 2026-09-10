@@ -12,8 +12,7 @@ function shapeCard(c) {
     subtypes: c.subtypes ? JSON.parse(c.subtypes) : [],
     variants: c.variants ? JSON.parse(c.variants) : null,
     images: { small: c.small_image, large: c.large_image },
-    set: { id: c.set_id, name: c.set_name },
-    pricing: c.pricing ? JSON.parse(c.pricing) : null,
+    set: { id: c.set_id },
   };
 }
 
