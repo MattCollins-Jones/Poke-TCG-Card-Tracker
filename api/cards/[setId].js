@@ -19,21 +19,6 @@ function shapeCard(c, setMap) {
           images: { symbol: setInfo.symbol_image ?? null, logo: setInfo.logo_image ?? null },
         }
       : { id: c.set_id },
-    pricing: (c.cm_trend || c.cm_trend_holo || c.tcp_normal_market || c.tcp_reverse_market) ? {
-      cardmarket: c.cm_trend != null ? {
-        trend: c.cm_trend,
-        avg30: c.cm_avg30,
-        low: c.cm_low,
-        trendHolo: c.cm_trend_holo,
-        avg30Holo: c.cm_avg30_holo,
-      } : null,
-      tcgplayer: c.tcp_normal_market != null ? {
-        normalMarket: c.tcp_normal_market,
-        normalLow: c.tcp_normal_low,
-        reverseMarket: c.tcp_reverse_market,
-      } : null,
-      updatedAt: c.price_updated_at,
-    } : null,
   };
 }
 
