@@ -12,7 +12,8 @@ function shapeCard(c) {
     subtypes: c.subtypes ? JSON.parse(c.subtypes) : [],
     variants: c.variants ? JSON.parse(c.variants) : null,
     images: { small: c.small_image, large: c.large_image },
-    set: { id: c.set_id },
+    set: { id: c.set_id, name: c.set_name },
+    pricing: c.pricing ? JSON.parse(c.pricing) : null,
   };
 }
 
@@ -31,6 +32,22 @@ router.get('/rarities/:setId', (req, res) => {
     `SELECT DISTINCT rarity FROM cards WHERE set_id = ? AND rarity IS NOT NULL ORDER BY rarity`
   ).all(req.params.setId);
   res.json(rows.map((r) => r.rarity));
+});
+
+// GET /api/cards/search?q=... — search cards by name
+router.get('/search', (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) {
+    return res.json({ data: [] });
+  }
+  const searchTerm = `%${q}%`;
+  const rows = db.prepare(`
+    SELECT * FROM cards 
+    WHERE name LIKE ? 
+    ORDER BY name, CAST(number AS INTEGER), number
+    LIMIT 100
+  `).all(searchTerm);
+  res.json({ data: rows.map(shapeCard) });
 });
 
 router.get('/:cardId', (req, res) => {
