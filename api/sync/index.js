@@ -161,7 +161,25 @@ export default async function handler(req, res) {
   const log = (msg) => { console.log('[sync]', msg); try { res.write(msg + '\n'); } catch {} };
 
   try {
-    if (phase === 'sets' || phase === 'auto') {
+    // Scheduled auto runs: if a previous run left cards still queued, keep draining
+    // that queue instead of re-running the sets phase (which would rebuild the
+    // pending list and reset the cursor to 0, so later batches would never run).
+    let runSetsPhase = phase === 'sets' || phase === 'auto';
+    if (isScheduledRun && phase === 'auto') {
+      const { data: pendingRows } = await supabase
+        .from('sync_meta')
+        .select('key, value')
+        .in('key', ['pending_card_ids', 'card_cursor']);
+      const pendingMeta = Object.fromEntries((pendingRows ?? []).map((r) => [r.key, r.value]));
+      const pendingCount = JSON.parse(pendingMeta.pending_card_ids ?? '[]').length;
+      const pendingCursor = parseInt(pendingMeta.card_cursor ?? '0', 10);
+      if (pendingCount > pendingCursor) {
+        log(`Resuming previous sync: ${pendingCount - pendingCursor} cards still queued — skipping sets phase.`);
+        runSetsPhase = false;
+      }
+    }
+
+    if (runSetsPhase) {
       log('Fetching sets list…');
       const setsRes = await fetchWithRetry(`${API}/sets`);
       if (!setsRes.ok) throw new Error(`Sets fetch failed: ${setsRes.status}`);
@@ -352,19 +370,31 @@ export default async function handler(req, res) {
       for (let i = 0; i < slice.length; i += BATCH) {
         const batch = slice.slice(i, i + BATCH);
         const cards = await fetchBatch(batch.map((id) => `${API}/cards/${id}`));
+        // Only include optional fields when TCGdex returned them, so an incomplete
+        // response can't null out data already stored (images, rarity, variants).
         const rows = cards.filter(Boolean).map((card) => ({
           id: card.id,
           set_id: card.set?.id ?? card.id.split('-')[0],
           name: card.name,
           number: card.localId ?? null,
-          rarity: card.rarity ?? null,
-          subtypes: card.stage ? [card.stage] : null,
-          variants: card.variants ?? null,
-          small_image: card.image ? `${card.image}/low.webp` : null,
-          large_image: card.image ? `${card.image}/high.webp` : null,
+          ...(card.rarity != null ? { rarity: card.rarity } : {}),
+          ...(card.stage ? { subtypes: [card.stage] } : {}),
+          ...(card.variants ? { variants: card.variants } : {}),
+          ...(card.image ? {
+            small_image: `${card.image}/low.webp`,
+            large_image: `${card.image}/high.webp`,
+          } : {}),
         }));
-        if (rows.length) {
-          const { error } = await supabase.from('cards').upsert(rows, { onConflict: 'id' });
+        // PostgREST normalises a batch to the union of keys and writes NULL for any
+        // missing ones, so group rows by their key set and upsert each group separately.
+        const groups = new Map();
+        for (const row of rows) {
+          const shape = Object.keys(row).sort().join(',');
+          if (!groups.has(shape)) groups.set(shape, []);
+          groups.get(shape).push(row);
+        }
+        for (const group of groups.values()) {
+          const { error } = await supabase.from('cards').upsert(group, { onConflict: 'id' });
           if (error) throw new Error(`Cards upsert: ${error.message}`);
         }
         await sleep(80);
