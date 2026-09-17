@@ -50,7 +50,23 @@ router.get('/search', (req, res) => {
 });
 
 router.get('/:cardId', (req, res) => {
-  const c = db.prepare(`SELECT * FROM cards WHERE id = ?`).get(req.params.cardId);
+  const { cardId } = req.params;
+
+  // Mirror the Vercel function's routing (api/cards/[setId].js) so the client
+  // can use the same paths locally: /api/cards/:setId and /api/cards/:setId?rarities=1
+  const asSet = db.prepare(`SELECT 1 FROM cards WHERE set_id = ? LIMIT 1`).get(cardId);
+  if (asSet) {
+    if (req.query.rarities === '1') {
+      const rows = db.prepare(
+        `SELECT DISTINCT rarity FROM cards WHERE set_id = ? AND rarity IS NOT NULL ORDER BY rarity`
+      ).all(cardId);
+      return res.json(rows.map((r) => r.rarity));
+    }
+    const rows = db.prepare(`SELECT * FROM cards WHERE set_id = ? ORDER BY CAST(number AS INTEGER), number`).all(cardId);
+    return res.json({ data: rows.map(shapeCard), totalCount: rows.length });
+  }
+
+  const c = db.prepare(`SELECT * FROM cards WHERE id = ?`).get(cardId);
   if (!c) return res.status(404).json({ error: 'Card not found' });
   res.json({ data: shapeCard(c) });
 });
