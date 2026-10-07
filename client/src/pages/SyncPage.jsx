@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/apiFetch.js';
+import { useDigitalFilter } from '../context/DigitalFilterContext.jsx';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -171,6 +172,7 @@ export default function SyncPage() {
   const [hasMore, setHasMore] = useState(false);
   const [hasPriceMore, setHasPriceMore] = useState(false);
   const [status, setStatus] = useState(null);
+  const { refreshSets } = useDigitalFilter();
 
   useEffect(() => {
     apiFetch('/api/sync').then(async (r) => {
@@ -202,6 +204,8 @@ export default function SyncPage() {
         if (!hasRemaining) apiFetch('/api/sync').then(async (r) => { if (r.ok) setStatus(await r.json()); });
       }
       setDone(!hasRemaining && phase !== 'prices');
+      // Sets/cards may have changed — refresh the shared catalog cache
+      if (phase !== 'prices') refreshSets();
     } catch (err) {
       setLog((prev) => [...prev, `Error: ${err.message}`]);
     }

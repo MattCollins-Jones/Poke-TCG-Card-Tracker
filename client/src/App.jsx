@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { CurrencyProvider } from './context/CurrencyContext.jsx';
+import { DigitalFilterProvider } from './context/DigitalFilterContext.jsx';
 import AuthGuard from './components/AuthGuard.jsx';
 import AdminGuard from './components/AdminGuard.jsx';
 import NavBar from './components/NavBar.jsx';
@@ -21,18 +22,20 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/*" element={
             <AuthGuard>
-              <NavBar />
-              <main className="main-content">
-                <Routes>
-                  <Route path="/" element={<SetsPage />} />
-                  <Route path="/sets/:setId" element={<CardsPage />} />
-                  <Route path="/search" element={<Navigate to="/" replace />} />
-                  <Route path="/collection" element={<CollectionPage />} />
-                  <Route path="/wishlist" element={<WishlistPage />} />
-                  <Route path="/sync" element={<SyncPage />} />
-                  <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
-                </Routes>
-              </main>
+              <DigitalFilterProvider>
+                <NavBar />
+                <main className="main-content">
+                  <Routes>
+                    <Route path="/" element={<SetsPage />} />
+                    <Route path="/sets/:setId" element={<CardsPage />} />
+                    <Route path="/search" element={<Navigate to="/" replace />} />
+                    <Route path="/collection" element={<CollectionPage />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/sync" element={<SyncPage />} />
+                    <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
+                  </Routes>
+                </main>
+              </DigitalFilterProvider>
             </AuthGuard>
           } />
         </Routes>

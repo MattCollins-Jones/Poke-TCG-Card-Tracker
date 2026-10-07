@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import CardModal from '../components/CardModal.jsx';
 import { apiFetch } from '../lib/apiFetch.js';
 import { FINISH_LABELS_SHORT, FINISH_TO_VARIANT_KEY } from '../utils/finishes.js';
+import { useDigitalFilter } from '../context/DigitalFilterContext.jsx';
+import DigitalToggle from '../components/DigitalToggle.jsx';
 
 function variantsFromEntries(entries) {
   const v = {};
@@ -13,7 +15,8 @@ function variantsFromEntries(entries) {
 }
 
 export default function WishlistPage() {
-  const [wishlist, setWishlist] = useState([]);
+  const { shouldHideSet, hideDigital } = useDigitalFilter();
+  const [rawWishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
@@ -36,6 +39,10 @@ export default function WishlistPage() {
       return { ...prev, entries: updatedEntries };
     });
   };
+
+  // Physical-only view when digital (TCG Pocket) cards are hidden
+  const wishlist = rawWishlist.filter((e) => !shouldHideSet(e.set_id));
+  const hiddenCount = rawWishlist.length - wishlist.length;
 
   const filtered = wishlist.filter((e) =>
     !search || e.card_name.toLowerCase().includes(search.toLowerCase())
@@ -103,7 +110,7 @@ export default function WishlistPage() {
     <div>
       <h1>⭐ Wishlist</h1>
 
-      {wishlist.length === 0 ? (
+      {rawWishlist.length === 0 ? (
         <div className="empty-state">
           <span className="emoji">⭐</span>
           Your wishlist is empty. Browse sets and mark cards you want!
@@ -112,6 +119,9 @@ export default function WishlistPage() {
         <>
           <div className="stats-bar">
             <div className="stat-chip"><strong>{wishlist.length}</strong> cards wanted</div>
+            {hideDigital && hiddenCount > 0 && (
+              <div className="stat-chip stat-chip-muted"><strong>{hiddenCount}</strong> digital hidden</div>
+            )}
           </div>
 
           <div className="filter-bar">
@@ -122,6 +132,7 @@ export default function WishlistPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            <DigitalToggle />
           </div>
 
           {Object.entries(grouped).map(([setId, group]) => (
@@ -171,7 +182,9 @@ export default function WishlistPage() {
           {filtered.length === 0 && (
             <div className="empty-state">
               <span className="emoji">🔍</span>
-              No cards match your search.
+              {wishlist.length === 0 && hideDigital
+                ? 'All your wishlisted cards are digital (TCG Pocket). Turn off the filter to see them.'
+                : 'No cards match your search.'}
             </div>
           )}
         </>

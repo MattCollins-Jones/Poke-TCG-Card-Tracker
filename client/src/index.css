@@ -429,6 +429,11 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   font-size: 0.9rem;
 }
 .stat-chip strong { color: var(--yellow); margin-right: 6px; }
+.stat-chip-muted { color: var(--text-muted); }
+.stat-chip-muted strong { color: var(--text-muted); }
+
+/* ── Digital (TCG Pocket) toggle ── */
+.digital-toggle { white-space: nowrap; }
 
 /* ── Card thumbnail: quick-add & qty controls ── */
 .card-item { position: relative; }

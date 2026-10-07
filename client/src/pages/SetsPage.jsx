@@ -4,6 +4,8 @@ import CardModal from "../components/CardModal.jsx";
 import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from "../utils/finishes.js";
 import { apiFetch } from "../lib/apiFetch.js";
 import { useCurrency } from "../context/CurrencyContext.jsx";
+import { useDigitalFilter } from "../context/DigitalFilterContext.jsx";
+import DigitalToggle from "../components/DigitalToggle.jsx";
 
 function getRarityColor(rarity) {
   if (!rarity) return null;
@@ -20,14 +22,12 @@ function getRarityColor(rarity) {
 export default function SetsPage() {
   const navigate = useNavigate();
   const { fmt, convertEur, convertUsd } = useCurrency();
+  const { sets: allSets, setsLoading: loading, setsError: error, refreshSets, hideDigital, isDigitalSeries, isDigitalSet } = useDigitalFilter();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const [sets, setSets] = useState([]);
   const [collectionSummary, setCollectionSummary] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const [cardResults, setCardResults] = useState([]);
   const [cardSearching, setCardSearching] = useState(false);
@@ -42,13 +42,8 @@ export default function SetsPage() {
   const loadingSetIds = useRef(new Set());
 
   useEffect(() => {
-    apiFetch("/api/sets")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) { setError(d.error); } else { setSets(d.data ?? []); }
-        setLoading(false);
-      })
-      .catch((e) => { setError(e.message); setLoading(false); });
+    // Revalidate the catalog on each visit so sync / admin changes show up
+    refreshSets();
 
     apiFetch("/api/collection?mode=summary")
       .then((r) => r.json())
@@ -193,6 +188,11 @@ export default function SetsPage() {
     return null;
   };
 
+  const sets = hideDigital ? allSets.filter((s) => !isDigitalSeries(s.series)) : allSets;
+  // Search results from the local Express API omit set.series, so also check by set ID
+  const isDigitalCard = (c) => isDigitalSeries(c.set?.series) || isDigitalSet(c.set?.id);
+  const visibleCardResults = hideDigital ? cardResults.filter((c) => !isDigitalCard(c)) : cardResults;
+
   const filtered = sets.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.series?.toLowerCase().includes(search.toLowerCase())
@@ -204,7 +204,7 @@ export default function SetsPage() {
     return acc;
   }, {});
 
-  const cardGrouped = cardResults.reduce((acc, card) => {
+  const cardGrouped = visibleCardResults.reduce((acc, card) => {
     const key = card.set.id;
     if (!acc[key]) acc[key] = { setInfo: card.set, cards: [] };
     acc[key].cards.push(card);
@@ -233,14 +233,15 @@ export default function SetsPage() {
         {search.length > 0 && (
           <button className="filter-btn" onClick={() => setSearch("")} title="Clear">x</button>
         )}
+        <DigitalToggle />
         {!isSearching && (
           <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{filtered.length} sets</span>
         )}
-        {isSearching && !cardSearching && (filtered.length > 0 || cardResults.length > 0) && (
+        {isSearching && !cardSearching && (filtered.length > 0 || visibleCardResults.length > 0) && (
           <span style={{ color: "var(--text-muted)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
             {filtered.length > 0 && `${filtered.length} set${filtered.length !== 1 ? "s" : ""}`}
-            {filtered.length > 0 && cardResults.length > 0 && " \u00B7 "}
-            {cardResults.length > 0 && `${cardResults.length} card${cardResults.length !== 1 ? "s" : ""}`}
+            {filtered.length > 0 && visibleCardResults.length > 0 && " \u00B7 "}
+            {visibleCardResults.length > 0 && `${visibleCardResults.length} card${visibleCardResults.length !== 1 ? "s" : ""}`}
           </span>
         )}
       </div>
@@ -319,14 +320,14 @@ export default function SetsPage() {
 
           {debouncedSearch.length >= 2 && (
             <>
-              {cardResults.length > 0 && (
+              {visibleCardResults.length > 0 && (
                 <h2 style={{ fontSize: "1rem", color: "var(--text-muted)", marginBottom: 12 }}>
-                  Cards ({cardResults.length} across {cardGroupEntries.length} set{cardGroupEntries.length !== 1 ? "s" : ""})
+                  Cards ({visibleCardResults.length} across {cardGroupEntries.length} set{cardGroupEntries.length !== 1 ? "s" : ""})
                 </h2>
               )}
               {cardSearching && <div className="loading" style={{ marginTop: 16 }}>Searching cards...</div>}
               {cardSearchError && <div className="loading" style={{ color: "#ef9a9a" }}>Error: {cardSearchError}</div>}
-              {!cardSearching && hasCardSearched && cardResults.length === 0 && (
+              {!cardSearching && hasCardSearched && visibleCardResults.length === 0 && (
                 <div className="empty-state" style={{ marginTop: 16 }}>
                   <span className="emoji">&#128269;</span>No cards found for "{debouncedSearch}".
                 </div>

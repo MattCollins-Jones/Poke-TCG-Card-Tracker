@@ -4,6 +4,12 @@ import db from '../db.js';
 const router = express.Router();
 
 router.get('/', (req, res) => {
+  // ?mode=series — lightweight {id, series} for every set (used for digital classification)
+  if (req.query.mode === 'series') {
+    const data = db.prepare('SELECT id, series FROM sets').all();
+    return res.json({ data });
+  }
+
   const rows = db.prepare(`
     SELECT s.*, COUNT(c.id) as card_count
     FROM sets s

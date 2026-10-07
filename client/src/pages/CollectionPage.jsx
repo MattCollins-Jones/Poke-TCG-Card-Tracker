@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import CardModal from '../components/CardModal.jsx';
 import { apiFetch } from '../lib/apiFetch.js';
+import { useDigitalFilter } from '../context/DigitalFilterContext.jsx';
+import DigitalToggle from '../components/DigitalToggle.jsx';
 
 const CONDITIONS = ['mint', 'good', 'played', 'poor'];
 
 export default function CollectionPage() {
-  const [collection, setCollection] = useState([]);
+  const { shouldHideSet, hideDigital } = useDigitalFilter();
+  const [rawCollection, setCollection] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterCondition, setFilterCondition] = useState('all');
   const [search, setSearch] = useState('');
@@ -19,6 +22,10 @@ export default function CollectionPage() {
   }, []);
 
   useEffect(() => { loadCollection(); }, [loadCollection]);
+
+  // Physical-only view when digital (TCG Pocket) cards are hidden
+  const collection = rawCollection.filter((e) => !shouldHideSet(e.set_id));
+  const hiddenCount = rawCollection.length - collection.length;
 
   const filtered = collection.filter((e) => {
     if (filterCondition !== 'all' && e.condition !== filterCondition) return false;
@@ -71,7 +78,7 @@ export default function CollectionPage() {
     <div>
       <h1>My Collection</h1>
 
-      {collection.length === 0 ? (
+      {rawCollection.length === 0 ? (
         <div className="empty-state">
           <span className="emoji">📦</span>
           Your collection is empty. Browse sets and add cards!
@@ -82,6 +89,9 @@ export default function CollectionPage() {
             <div className="stat-chip"><strong>{uniqueCards}</strong> unique cards</div>
             <div className="stat-chip"><strong>{totalCards}</strong> total copies</div>
             <div className="stat-chip"><strong>{Object.keys(grouped).length}</strong> sets</div>
+            {hideDigital && hiddenCount > 0 && (
+              <div className="stat-chip stat-chip-muted"><strong>{hiddenCount}</strong> digital hidden</div>
+            )}
           </div>
 
           <div className="filter-bar">
@@ -98,6 +108,7 @@ export default function CollectionPage() {
                 {c.charAt(0).toUpperCase() + c.slice(1)}
               </button>
             ))}
+            <DigitalToggle />
           </div>
 
           {Object.entries(grouped).map(([setId, group]) => (
@@ -134,7 +145,9 @@ export default function CollectionPage() {
           {filtered.length === 0 && (
             <div className="empty-state">
               <span className="emoji">🔍</span>
-              No cards match this filter.
+              {collection.length === 0 && hideDigital
+                ? 'All your collected cards are digital (TCG Pocket). Turn off the filter to see them.'
+                : 'No cards match this filter.'}
             </div>
           )}
         </>

@@ -5,6 +5,14 @@ export default async function handler(req, res) {
 
   const supabase = createServiceClient();
 
+  // ?mode=series — lightweight {id, series} for every set, including admin-hidden
+  // ones, so clients can classify saved collection entries from hidden sets.
+  if (req.query.mode === 'series') {
+    const { data, error } = await supabase.from('sets').select('id, series');
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ data: data ?? [] });
+  }
+
   const { data: rows, error } = await supabase
     .from('sets')
     .select('*')

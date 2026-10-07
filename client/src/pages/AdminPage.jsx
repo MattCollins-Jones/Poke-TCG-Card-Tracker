@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/apiFetch.js';
 import ImageUpload from '../components/ImageUpload.jsx';
+import { useDigitalFilter } from '../context/DigitalFilterContext.jsx';
 
 // ── Shared toggle helper ──────────────────────────────────────────────────────
 
-async function toggleHidden(endpoint, id, currentHidden, setItems, setToggling) {
+async function toggleHidden(endpoint, id, currentHidden, setItems, setToggling, onChanged) {
   setToggling(prev => ({ ...prev, [id]: true }));
   try {
     const res = await apiFetch(`${endpoint}/${id}`, {
@@ -15,6 +16,7 @@ async function toggleHidden(endpoint, id, currentHidden, setItems, setToggling) 
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     setItems(prev => prev.map(item => item.id !== id ? item : { ...item, hidden: !currentHidden }));
+    onChanged?.();
   } catch (e) {
     alert(`Failed to update visibility: ${e.message}`);
   }
@@ -233,6 +235,7 @@ function SetsAdmin() {
   const [toggling, setToggling] = useState({});
   const [edits, setEdits] = useState({});
   const [feedback, setFeedback] = useState({});
+  const { refreshSets } = useDigitalFilter();
 
   const loadSets = () => {
     setLoading(true);
@@ -240,6 +243,7 @@ function SetsAdmin() {
       setSets(d.data ?? []);
       setLoading(false);
     });
+    refreshSets();
   };
 
   useEffect(() => { loadSets(); }, []);
@@ -283,6 +287,7 @@ function SetsAdmin() {
         },
       }));
       setEdits(prev => { const n = { ...prev }; delete n[set.id]; return n; });
+      refreshSets();
       setFeedback(prev => ({ ...prev, [set.id]: 'saved' }));
       setTimeout(() => setFeedback(prev => { const n = { ...prev }; delete n[set.id]; return n; }), 2000);
     } catch (e) {
@@ -371,7 +376,7 @@ function SetsAdmin() {
                     <button
                       className="admin-vis-btn"
                       title={set.hidden ? 'Show set' : 'Hide set'}
-                      onClick={() => toggleHidden('/api/admin/sets', set.id, set.hidden, setSets, setToggling)}
+                      onClick={() => toggleHidden('/api/admin/sets', set.id, set.hidden, setSets, setToggling, refreshSets)}
                       disabled={toggling[set.id]}
                     >
                       {set.hidden ? '🙈' : '👁'}
