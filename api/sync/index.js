@@ -50,9 +50,15 @@ const isTcgdexAsset = (url) => typeof url === 'string' && url.includes(ASSET_HOS
 // images (Supabase storage etc.) are never touched.
 const needsResolve = (url) => !url || isTcgdexAsset(url);
 
+const HEAD_TIMEOUT_MS = 5000;
+// Shared deadline for HEAD probes, set per request by the handler so a probe can
+// never run past the invocation's time budget. 0 = no deadline (unit tests etc.).
+let probeDeadline = 0;
 async function headOk(url) {
+  const remaining = probeDeadline ? probeDeadline - Date.now() : HEAD_TIMEOUT_MS;
+  if (remaining <= 0) return false;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
+  const timer = setTimeout(() => controller.abort(), Math.min(HEAD_TIMEOUT_MS, remaining));
   try {
     const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
     return res.ok;
@@ -60,7 +66,10 @@ async function headOk(url) {
   finally { clearTimeout(timer); }
 }
 
-const assetCache = new Map();
+// Request-scoped: reset at the start of every handler invocation. A module-level
+// cache would survive on a warm instance and keep serving stale null/dead results,
+// so later syncs would never discover newly published or removed artwork.
+let assetCache = new Map();
 async function resolveAssetUrl(base) {
   if (!base) return null;
   if (assetCache.has(base)) return assetCache.get(base);
@@ -157,6 +166,14 @@ export default async function handler(req, res) {
   const TIME_BUDGET_MS = 48_000;
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - START_TIME);
   const outOfTime = () => timeLeft() <= 0;
+  // Worst case for one image-verification batch: two sequential ext probes plus a
+  // dead-check on the stored URL (3 × HEAD_TIMEOUT_MS), then the DB write.
+  const IMG_BATCH_WORST_MS = 3 * HEAD_TIMEOUT_MS + 1000;
+  // Scheduled runs keep this much budget back from card draining so the daily
+  // price batch isn't starved while a long pending queue is being worked off.
+  const PRICE_RESERVE_MS = 15_000;
+  probeDeadline = START_TIME + TIME_BUDGET_MS;
+  assetCache = new Map();
 
   // Cron-only decision: should this run kick off a fresh sets+cards sync today?
   // (Separate from draining an existing queue, which happens every day.)
@@ -188,7 +205,18 @@ export default async function handler(req, res) {
       const now = new Date();
       if (scheduleType === 'weekly')       isSyncDay = now.getUTCDay()  === scheduleDay;
       else if (scheduleType === 'monthly') isSyncDay = now.getUTCDate() === scheduleDay;
-      // 'manual_only' → never auto-run
+
+      // 'manual_only' means exactly that: the cron must not drain a queue or
+      // rotate prices either — everything runs from the admin UI.
+      if (scheduleType === 'manual_only') {
+        try {
+          await supabase.from('sync_meta').upsert(
+            { key: 'last_cron_result', value: 'skipped — schedule is manual only' },
+            { onConflict: 'key' }
+          );
+        } catch {}
+        return res.status(200).json({ skipped: true, reason: 'manual_only' });
+      }
 
       const pendingCount  = JSON.parse(schedMeta.pending_card_ids ?? '[]').length;
       const pendingCursor = parseInt(schedMeta.card_cursor ?? '0', 10);
@@ -259,7 +287,9 @@ export default async function handler(req, res) {
       let checked = 0, fixed = 0, cleared = 0;
       const IMG_BATCH = 10;
       for (let i = cursor; i < dbSets.length; i += IMG_BATCH) {
-        if (outOfTime()) break;
+        // Don't start a batch unless its worst case fits — otherwise the platform
+        // can kill the function before image_cursor below is persisted.
+        if (timeLeft() < IMG_BATCH_WORST_MS) break;
         const batch = dbSets.slice(i, i + IMG_BATCH);
         await Promise.all(batch.map(async (s) => {
           const api = apiSets[s.id] ?? {};
@@ -364,10 +394,6 @@ export default async function handler(req, res) {
         if (error) throw new Error(`Sets upsert: ${error.message}`);
       }
       log(`Upserted ${sets.length} sets (${repairedImages} set images added/repaired). Fetching set details…`);
-      const noArtwork = sets.filter((s) => !existingImages[s.id]?.logo_image && !existingImages[s.id]?.symbol_image).map((s) => s.id);
-      if (noArtwork.length) {
-        log(`${noArtwork.length} sets still have no TCGdex artwork (showing default image; re-checked every sync): ${noArtwork.join(', ')}`);
-      }
 
       // Fetch ALL existing card IDs and image status — paginate because Supabase caps at 1000 rows per request
       const existingIds = new Set();
@@ -392,7 +418,16 @@ export default async function handler(req, res) {
       const queuedIds = new Set();
       let refreshedRecentCount = 0;
       const recentCutoff = Date.now() - RECENT_SET_DAYS * 24 * 60 * 60 * 1000;
+      let detailsCutShort = false;
       for (let i = 0; i < sets.length; i += BATCH) {
+        // A slow upstream can push this loop past the budget. Stop early and persist
+        // what has been queued so far rather than losing the whole run's progress;
+        // the remaining sets are picked up on the next sync day.
+        if (outOfTime()) {
+          detailsCutShort = true;
+          log(`Time budget reached after ${i} of ${sets.length} set details — saving partial card queue.`);
+          break;
+        }
         const batch = sets.slice(i, i + BATCH);
         const details = await fetchBatch(batch.map((s) => `${API}/sets/${s.id}`));
         for (const detail of details) {
@@ -412,6 +447,7 @@ export default async function handler(req, res) {
             ...(logo_image   && logo_image   !== imgs.logo_image   ? { logo_image }   : {}),
             ...(symbol_image && symbol_image !== imgs.symbol_image ? { symbol_image } : {}),
           }).eq('id', detail.id);
+          existingImages[detail.id] = { id: detail.id, logo_image: logo_image ?? null, symbol_image: symbol_image ?? null };
           if (detail.cards) {
             const newCards = detail.cards.filter((c) => !existingIds.has(c.id));
             if (newCards.length > 0) {
@@ -484,6 +520,14 @@ export default async function handler(req, res) {
       const newCardsQueuedCount = pendingCardIds.length - requeuedImagelessCount - refreshedRecentCount;
       log(`${initialExistingCount} cards in DB initially, ${initialImagelessCount} without images, ${newCardsQueuedCount} new cards queued, ${requeuedImagelessCount} imageless cards re-queued, ${refreshedRecentCount} cards from recent sets (last ${RECENT_SET_DAYS} days) queued for refresh.`);
 
+      // Report after the detail pass, since that pass can fill in images the list endpoint omitted
+      if (!detailsCutShort) {
+        const noArtwork = sets.filter((s) => !existingImages[s.id]?.logo_image && !existingImages[s.id]?.symbol_image).map((s) => s.id);
+        if (noArtwork.length) {
+          log(`${noArtwork.length} sets still have no TCGdex artwork (showing default image; re-checked every sync): ${noArtwork.join(', ')}`);
+        }
+      }
+
       // Store pending IDs and reset cursor
       await supabase.from('sync_meta').upsert([
         { key: 'pending_card_ids', value: JSON.stringify(pendingCardIds) },
@@ -525,9 +569,11 @@ export default async function handler(req, res) {
       const slice = pendingCardIds.slice(cursor, cursor + CARD_BATCH_SIZE);
       log(`Syncing cards ${cursor + 1}–${cursor + slice.length} of ${pendingCardIds.length}…`);
 
+      // Scheduled runs hold back a reserve so the price batch after this still runs
+      const cardsReserveMs = isScheduledRun && phase === 'auto' ? PRICE_RESERVE_MS : 0;
       let processed = 0;
       for (let i = 0; i < slice.length; i += BATCH) {
-        if (outOfTime()) {
+        if (timeLeft() <= cardsReserveMs) {
           log(`Time budget reached after ${processed} cards — saving progress.`);
           break;
         }
