@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/apiFetch.js';
 import ImageUpload from '../components/ImageUpload.jsx';
+import SetImage, { setImageCandidates } from '../components/SetImage.jsx';
 import { useDigitalFilter } from '../context/DigitalFilterContext.jsx';
 
 // ── Shared toggle helper ──────────────────────────────────────────────────────
@@ -336,11 +337,17 @@ function SetsAdmin() {
             {filtered.map(set => (
               <tr key={set.id} style={set.hidden ? { opacity: 0.45 } : {}}>
                 <td className="admin-preview">
-                  {(edits[set.id]?.logo_image ?? set.images?.logo) ? (
-                    <img src={edits[set.id]?.logo_image ?? set.images?.logo} alt="" onError={e => e.target.style.display='none'} />
-                  ) : (edits[set.id]?.symbol_image ?? set.images?.symbol) ? (
-                    <img src={edits[set.id]?.symbol_image ?? set.images?.symbol} alt="" onError={e => e.target.style.display='none'} />
-                  ) : <span className="admin-no-img">–</span>}
+                  <SetImage
+                    set={set}
+                    candidates={setImageCandidates({
+                      id: set.id,
+                      images: {
+                        logo:   edits[set.id]?.logo_image   ?? set.images?.logo,
+                        symbol: edits[set.id]?.symbol_image ?? set.images?.symbol,
+                      },
+                    })}
+                    title={(set.images?.logo || set.images?.symbol) ? undefined : 'No image from TCGdex — showing bundled/default fallback. Upload or paste a URL to override.'}
+                  />
                 </td>
                 <td className="admin-id">{set.id}</td>
                 <td>

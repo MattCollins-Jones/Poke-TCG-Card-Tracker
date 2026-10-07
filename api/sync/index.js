@@ -364,6 +364,10 @@ export default async function handler(req, res) {
         if (error) throw new Error(`Sets upsert: ${error.message}`);
       }
       log(`Upserted ${sets.length} sets (${repairedImages} set images added/repaired). Fetching set details…`);
+      const noArtwork = sets.filter((s) => !existingImages[s.id]?.logo_image && !existingImages[s.id]?.symbol_image).map((s) => s.id);
+      if (noArtwork.length) {
+        log(`${noArtwork.length} sets still have no TCGdex artwork (showing default image; re-checked every sync): ${noArtwork.join(', ')}`);
+      }
 
       // Fetch ALL existing card IDs and image status — paginate because Supabase caps at 1000 rows per request
       const existingIds = new Set();

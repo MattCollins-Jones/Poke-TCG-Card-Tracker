@@ -277,7 +277,10 @@ export default function SyncPage() {
       <h2 style={{ fontSize: '1rem', marginBottom: 8 }}>🖼️ Set Images</h2>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: 14 }}>
         Checks every set logo and symbol against the TCGdex image CDN and repairs URLs that have
-        moved or changed format. Custom-uploaded images are never touched.
+        moved or changed format. Custom-uploaded images are never touched. Sets TCGdex has no
+        artwork for show a bundled or default image and are re-checked against the API on every
+        sets sync, so they pick up images automatically if they appear later. Override any set's
+        image from the Admin page.
       </p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary" onClick={() => runPhase('images')} disabled={running}>

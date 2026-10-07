@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import CardModal from '../components/CardModal.jsx';
 import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from '../utils/finishes.js';
 import { apiFetch } from '../lib/apiFetch.js';
+import SetImage from '../components/SetImage.jsx';
 
 const OWNERSHIP_FILTERS = ['all', 'owned', 'not owned', 'wishlist'];
 
@@ -263,7 +264,7 @@ export default function CardsPage() {
       <button className="back-btn" onClick={() => navigate('/')}>← Back to Sets</button>
 
       <h1 style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {setInfo?.images?.symbol && <img src={setInfo.images.symbol} alt="" style={{ height: 28 }} />}
+        {setInfo && <SetImage set={setInfo} preferSymbol noDefault style={{ height: 28 }} />}
         {setInfo?.name ?? setId}
       </h1>
 
