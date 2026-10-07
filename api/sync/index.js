@@ -37,6 +37,65 @@ async function fetchBatch(urls) {
   );
 }
 
+// ── Set image resolution ────────────────────────────────────────────────────
+// TCGdex returns extension-less asset URLs (e.g. …/sv/sv01/logo) and the client
+// appends a format. Two things have changed upstream:
+//   1. Set symbols are published under assets.tcgdex.net/univ/… which now returns
+//      "InvalidBucketName" for every set; the same path under /en/ still works.
+//   2. Not every asset exists as .webp — a handful are only available as .png.
+// So rewrite the host path and probe .webp then .png with HEAD requests.
+const ASSET_HOST = 'assets.tcgdex.net';
+const isTcgdexAsset = (url) => typeof url === 'string' && url.includes(ASSET_HOST);
+// Only re-resolve URLs that we previously derived from TCGdex. Custom-uploaded
+// images (Supabase storage etc.) are never touched.
+const needsResolve = (url) => !url || isTcgdexAsset(url);
+
+async function headOk(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    return res.ok;
+  } catch { return false; }
+  finally { clearTimeout(timer); }
+}
+
+const assetCache = new Map();
+async function resolveAssetUrl(base) {
+  if (!base) return null;
+  if (assetCache.has(base)) return assetCache.get(base);
+  const fixed = base.replace(`${ASSET_HOST}/univ/`, `${ASSET_HOST}/en/`);
+  let resolved = null;
+  for (const ext of ['webp', 'png']) {
+    if (await headOk(`${fixed}.${ext}`)) { resolved = `${fixed}.${ext}`; break; }
+  }
+  assetCache.set(base, resolved);
+  return resolved;
+}
+
+// Pick the image to store during the regular sets phase. This must stay cheap
+// (the CDN throttles HEAD probes — a full verification of every set takes ~30 s),
+// so only brand-new sets are probed here. Known-broken /univ/ URLs are rewritten
+// in place; phase=images does the thorough per-set verification.
+async function pickImage(existing, apiBase) {
+  if (!needsResolve(existing)) return existing;                       // custom upload — never touch
+  if (existing) return existing.replace(`${ASSET_HOST}/univ/`, `${ASSET_HOST}/en/`);
+  return (await resolveAssetUrl(apiBase)) ?? null;                     // new set — probe once
+}
+
+// Thorough version used by phase=images: re-probe TCGdex-hosted URLs so .webp→.png
+// mismatches and dead assets get corrected. Falls back to the existing value when
+// the probe fails outright, so a CDN blip never wipes an image we already had.
+async function verifyImage(existing, apiBase) {
+  if (!needsResolve(existing)) return existing;
+  const base = apiBase ?? (existing ? existing.replace(/\.(webp|png)$/, '') : null);
+  const resolved = await resolveAssetUrl(base);
+  if (resolved) return resolved;
+  // Nothing resolvable: only clear it when the stored URL is itself confirmed dead
+  if (existing && !(await headOk(existing))) return null;
+  return existing ?? null;
+}
+
 async function requireAdminUser(req, res) {
   const user = await getUser(req);
   if (!user) { res.status(401).json({ error: 'Unauthorised' }); return false; }
@@ -86,8 +145,23 @@ export default async function handler(req, res) {
   // phase=cards    → fetch next batch of pending card IDs from sync_meta, upsert, advance cursor
   // phase=prices   → fetch next batch of ALL card IDs and update pricing columns only
   // phase=auto     → run sets phase then card batch (default for cron and manual)
+  // phase=images   → verify/repair every set logo & symbol URL against the TCGdex CDN (time-boxed, resumable)
   // phase=schedule → save schedule config (scheduleType, scheduleDay)
   const phase = req.query.phase ?? 'auto';
+
+  // Vercel functions are capped at 60 s (vercel.json maxDuration). Each phase
+  // checks this budget between batches and saves its cursor when time is short,
+  // so the next invocation picks up where this one left off instead of the
+  // function being killed mid-run with nothing recorded.
+  const START_TIME = Date.now();
+  const TIME_BUDGET_MS = 48_000;
+  const timeLeft = () => TIME_BUDGET_MS - (Date.now() - START_TIME);
+  const outOfTime = () => timeLeft() <= 0;
+
+  // Cron-only decision: should this run kick off a fresh sets+cards sync today?
+  // (Separate from draining an existing queue, which happens every day.)
+  let isSyncDay = false;
+  let cronSkippedSets = false;
 
   if (isScheduledRun) {
     // Record every cron invocation so the admin UI can show whether Vercel is firing the cron at all.
@@ -100,31 +174,34 @@ export default async function handler(req, res) {
       );
     } catch {}
 
-    // Prices cron (phase=prices) always runs — the cron schedule controls the cadence.
-    // Auto/sets/cards cron checks the user-configured schedule day before running.
+    // The cron fires daily; the user-configured schedule decides which day a NEW
+    // full sync starts. Other days still drain any cards left in the queue and
+    // rotate a price batch, so a weekly schedule doesn't need the whole sync to
+    // fit into one 60 s invocation.
     if (phase !== 'prices') {
       const { data: schedRows } = await supabase.from('sync_meta').select('key, value')
-        .in('key', ['schedule_type', 'schedule_day']);
+        .in('key', ['schedule_type', 'schedule_day', 'pending_card_ids', 'card_cursor']);
       const schedMeta = Object.fromEntries((schedRows ?? []).map((r) => [r.key, r.value]));
       const scheduleType = schedMeta.schedule_type ?? 'monthly';
       const scheduleDay  = parseInt(schedMeta.schedule_day ?? '1', 10);
 
       const now = new Date();
-      let shouldRun = false;
-      if (scheduleType === 'weekly')       shouldRun = now.getUTCDay()  === scheduleDay;
-      else if (scheduleType === 'monthly') shouldRun = now.getUTCDate() === scheduleDay;
+      if (scheduleType === 'weekly')       isSyncDay = now.getUTCDay()  === scheduleDay;
+      else if (scheduleType === 'monthly') isSyncDay = now.getUTCDate() === scheduleDay;
       // 'manual_only' → never auto-run
 
-      if (!shouldRun) {
+      const pendingCount  = JSON.parse(schedMeta.pending_card_ids ?? '[]').length;
+      const pendingCursor = parseInt(schedMeta.card_cursor ?? '0', 10);
+      const hasPending = pendingCount > pendingCursor;
+
+      if (!isSyncDay && !hasPending) {
+        cronSkippedSets = true;
         try {
           await supabase.from('sync_meta').upsert(
-            { key: 'last_cron_result', value: `skipped — not sync day (${scheduleType}/${scheduleDay}, UTC day ${now.getUTCDay()}, UTC date ${now.getUTCDate()})` },
+            { key: 'last_cron_result', value: `skipped sets — not sync day (${scheduleType}/${scheduleDay}, UTC day ${now.getUTCDay()}, UTC date ${now.getUTCDate()}); running price batch` },
             { onConflict: 'key' }
           );
         } catch {}
-        res.setHeader('Content-Type', 'text/plain');
-        res.write('Scheduled check — not sync day. Skipping.\n');
-        return res.end();
       }
     }
   } else {
@@ -132,16 +209,16 @@ export default async function handler(req, res) {
     const ok = await requireAdminUser(req, res);
     if (!ok) return;
   }
-  const CARD_BATCH_SIZE = 1000; // cards per invocation
+  const CARD_BATCH_SIZE = 1000; // cards per invocation (upper bound — the time budget usually stops earlier)
   // Sets released within this window get all their cards re-fetched on every sync,
   // because TCGdex often publishes new sets with incomplete variant/rarity data.
   const RECENT_SET_DAYS = 365;
 
   // Record that this cron run is proceeding to actual sync work
-  if (isScheduledRun) {
+  if (isScheduledRun && !cronSkippedSets) {
     try {
       await supabase.from('sync_meta').upsert(
-        { key: 'last_cron_result', value: `running — sync day matched, proceeding with phase=${phase}` },
+        { key: 'last_cron_result', value: `running — ${isSyncDay ? 'sync day matched' : 'draining pending card queue'}, phase=${phase}` },
         { onConflict: 'key' }
       );
     } catch {}
@@ -161,21 +238,82 @@ export default async function handler(req, res) {
   const log = (msg) => { console.log('[sync]', msg); try { res.write(msg + '\n'); } catch {} };
 
   try {
-    // Scheduled auto runs: if a previous run left cards still queued, keep draining
-    // that queue instead of re-running the sets phase (which would rebuild the
-    // pending list and reset the cursor to 0, so later batches would never run).
+    // ── Set image verification ───────────────────────────────────────────────
+    if (phase === 'images') {
+      const { data: metaRows } = await supabase.from('sync_meta').select('key, value').in('key', ['image_cursor']);
+      const cursor = parseInt(Object.fromEntries((metaRows ?? []).map((r) => [r.key, r.value])).image_cursor ?? '0', 10);
+
+      const setsRes = await fetchWithRetry(`${API}/sets`);
+      if (!setsRes.ok) throw new Error(`Sets fetch failed: ${setsRes.status}`);
+      const apiSets = Object.fromEntries((await setsRes.json()).map((s) => [s.id, s]));
+
+      const dbSets = [];
+      for (let from = 0; ; from += 1000) {
+        const { data: page } = await supabase.from('sets').select('id, logo_image, symbol_image').order('id').range(from, from + 999);
+        if (!page || page.length === 0) break;
+        dbSets.push(...page);
+        if (page.length < 1000) break;
+      }
+
+      log(`Verifying set images ${cursor + 1}–${dbSets.length} of ${dbSets.length}…`);
+      let checked = 0, fixed = 0, cleared = 0;
+      const IMG_BATCH = 10;
+      for (let i = cursor; i < dbSets.length; i += IMG_BATCH) {
+        if (outOfTime()) break;
+        const batch = dbSets.slice(i, i + IMG_BATCH);
+        await Promise.all(batch.map(async (s) => {
+          const api = apiSets[s.id] ?? {};
+          const [logo_image, symbol_image] = await Promise.all([
+            verifyImage(s.logo_image,   api.logo),
+            verifyImage(s.symbol_image, api.symbol),
+          ]);
+          const patch = {};
+          if (logo_image   !== (s.logo_image   ?? null)) patch.logo_image   = logo_image;
+          if (symbol_image !== (s.symbol_image ?? null)) patch.symbol_image = symbol_image;
+          if (Object.keys(patch).length) {
+            const { error } = await supabase.from('sets').update(patch).eq('id', s.id);
+            if (error) throw new Error(`Set image update (${s.id}): ${error.message}`);
+            Object.values(patch).forEach((v) => (v ? fixed++ : cleared++));
+            log(`  ${s.id}: ${Object.entries(patch).map(([k, v]) => `${k} → ${v ?? 'none'}`).join(', ')}`);
+          }
+        }));
+        checked += batch.length;
+      }
+
+      const newCursor = cursor + checked;
+      const remaining = dbSets.length - newCursor;
+      await supabase.from('sync_meta').upsert(
+        { key: 'image_cursor', value: remaining <= 0 ? '0' : String(newCursor) },
+        { onConflict: 'key' }
+      );
+      log(`Checked ${checked} sets: ${fixed} image URLs repaired, ${cleared} dead images cleared.`);
+      log(remaining <= 0
+        ? 'Set image verification complete!'
+        : `${remaining} sets remaining — click "Verify Set Images" again to continue.`);
+      return res.end();
+    }
+
+    // Scheduled auto runs: only start a fresh sets phase on the configured sync
+    // day, and only if no previous run left cards still queued. Re-running the
+    // sets phase would rebuild the pending list and reset the cursor to 0.
     let runSetsPhase = phase === 'sets' || phase === 'auto';
     if (isScheduledRun && phase === 'auto') {
-      const { data: pendingRows } = await supabase
-        .from('sync_meta')
-        .select('key, value')
-        .in('key', ['pending_card_ids', 'card_cursor']);
-      const pendingMeta = Object.fromEntries((pendingRows ?? []).map((r) => [r.key, r.value]));
-      const pendingCount = JSON.parse(pendingMeta.pending_card_ids ?? '[]').length;
-      const pendingCursor = parseInt(pendingMeta.card_cursor ?? '0', 10);
-      if (pendingCount > pendingCursor) {
-        log(`Resuming previous sync: ${pendingCount - pendingCursor} cards still queued — skipping sets phase.`);
+      if (cronSkippedSets) {
         runSetsPhase = false;
+      } else {
+        const { data: pendingRows } = await supabase
+          .from('sync_meta')
+          .select('key, value')
+          .in('key', ['pending_card_ids', 'card_cursor']);
+        const pendingMeta = Object.fromEntries((pendingRows ?? []).map((r) => [r.key, r.value]));
+        const pendingCount = JSON.parse(pendingMeta.pending_card_ids ?? '[]').length;
+        const pendingCursor = parseInt(pendingMeta.card_cursor ?? '0', 10);
+        if (pendingCount > pendingCursor) {
+          log(`Resuming previous sync: ${pendingCount - pendingCursor} cards still queued — skipping sets phase.`);
+          runSetsPhase = false;
+        } else if (!isSyncDay) {
+          runSetsPhase = false;
+        }
       }
     }
 
@@ -198,27 +336,34 @@ export default async function handler(req, res) {
         }
       }
 
-      // Upsert basic set info — never overwrite a field that already has a value in the DB
+      // Upsert basic set info — never overwrite a custom image that's already in the DB
+      let repairedImages = 0;
       for (let i = 0; i < sets.length; i += BATCH) {
-        const rows = sets.slice(i, i + BATCH).map((s) => {
+        const rows = await Promise.all(sets.slice(i, i + BATCH).map(async (s) => {
           const existing = existingImages[s.id] ?? {};
           // Always include logo/symbol columns so every row in the batch has the same
           // shape. If some rows omit a column, PostgREST normalises the missing fields
           // to NULL in the ON CONFLICT DO UPDATE, which would clear any existing value.
-          // Prefer the DB value (custom or previously synced); fall back to the API value.
+          const [logo_image, symbol_image] = await Promise.all([
+            pickImage(existing.logo_image,   s.logo),
+            pickImage(existing.symbol_image, s.symbol),
+          ]);
+          if (logo_image !== (existing.logo_image ?? null) || symbol_image !== (existing.symbol_image ?? null)) repairedImages++;
+          // Remember what we stored so the set-detail pass below doesn't redo the work
+          existingImages[s.id] = { id: s.id, logo_image, symbol_image };
           return {
             id: s.id,
             name: s.name,
             total: s.cardCount?.total ?? null,
             printed_total: s.cardCount?.official ?? null,
-            logo_image:   existing.logo_image   || (s.logo   ? `${s.logo}.webp`   : null),
-            symbol_image: existing.symbol_image || (s.symbol ? `${s.symbol}.webp` : null),
+            logo_image,
+            symbol_image,
           };
-        });
+        }));
         const { error } = await supabase.from('sets').upsert(rows, { onConflict: 'id' });
         if (error) throw new Error(`Sets upsert: ${error.message}`);
       }
-      log(`Upserted ${sets.length} sets. Fetching set details…`);
+      log(`Upserted ${sets.length} sets (${repairedImages} set images added/repaired). Fetching set details…`);
 
       // Fetch ALL existing card IDs and image status — paginate because Supabase caps at 1000 rows per request
       const existingIds = new Set();
@@ -248,14 +393,20 @@ export default async function handler(req, res) {
         const details = await fetchBatch(batch.map((s) => `${API}/sets/${s.id}`));
         for (const detail of details) {
           if (!detail) continue;
+          // The set-detail endpoint sometimes carries a logo/symbol the list endpoint
+          // omits — resolve those too, but still never touch a custom image.
+          const imgs = existingImages[detail.id] ?? {};
+          const [logo_image, symbol_image] = await Promise.all([
+            imgs.logo_image   ? imgs.logo_image   : pickImage(imgs.logo_image,   detail.logo),
+            imgs.symbol_image ? imgs.symbol_image : pickImage(imgs.symbol_image, detail.symbol),
+          ]);
           await supabase.from('sets').update({
             series: detail.serie?.name ?? null,
             release_date: detail.releaseDate ?? null,
             total: detail.cardCount?.total ?? detail.cards?.length ?? null,
             printed_total: detail.cardCount?.official ?? null,
-            // Only set image fields if the DB doesn't already have a custom value
-            ...(detail.symbol && !existingImages[detail.id]?.symbol_image ? { symbol_image: `${detail.symbol}.webp` } : {}),
-            ...(detail.logo   && !existingImages[detail.id]?.logo_image   ? { logo_image:   `${detail.logo}.webp`   } : {}),
+            ...(logo_image   && logo_image   !== imgs.logo_image   ? { logo_image }   : {}),
+            ...(symbol_image && symbol_image !== imgs.symbol_image ? { symbol_image } : {}),
           }).eq('id', detail.id);
           if (detail.cards) {
             const newCards = detail.cards.filter((c) => !existingIds.has(c.id));
@@ -361,13 +512,21 @@ export default async function handler(req, res) {
             { key: 'last_sync_type', value: 'scheduled' },
           ], { onConflict: 'key' });
         }
-        return res.end();
-      }
+        if (phase === 'cards') return res.end();
+      } else if (outOfTime()) {
+        log(`Time budget used by sets phase — ${pendingCardIds.length - cursor} cards will sync on the next run.`);
+        if (phase === 'cards') return res.end();
+      } else {
 
       const slice = pendingCardIds.slice(cursor, cursor + CARD_BATCH_SIZE);
       log(`Syncing cards ${cursor + 1}–${cursor + slice.length} of ${pendingCardIds.length}…`);
 
+      let processed = 0;
       for (let i = 0; i < slice.length; i += BATCH) {
+        if (outOfTime()) {
+          log(`Time budget reached after ${processed} cards — saving progress.`);
+          break;
+        }
         const batch = slice.slice(i, i + BATCH);
         const cards = await fetchBatch(batch.map((id) => `${API}/cards/${id}`));
         // Only include optional fields when TCGdex returned them, so an incomplete
@@ -397,10 +556,11 @@ export default async function handler(req, res) {
           const { error } = await supabase.from('cards').upsert(group, { onConflict: 'id' });
           if (error) throw new Error(`Cards upsert: ${error.message}`);
         }
+        processed += batch.length;
         await sleep(80);
       }
 
-      const newCursor = cursor + slice.length;
+      const newCursor = cursor + processed;
       const remaining = pendingCardIds.length - newCursor;
 
       if (remaining <= 0) {
@@ -412,19 +572,45 @@ export default async function handler(req, res) {
           { key: 'last_sync_type',   value: isScheduledRun ? 'scheduled' : 'manual' },
         ], { onConflict: 'key' });
         log(`All cards synced! Total: ${pendingCardIds.length} cards processed.`);
+        if (isScheduledRun) {
+          try {
+            await supabase.from('sync_meta').upsert(
+              { key: 'last_cron_result', value: `completed — all ${pendingCardIds.length} queued cards synced` },
+              { onConflict: 'key' }
+            );
+          } catch {}
+        }
       } else {
         await supabase.from('sync_meta').upsert(
           { key: 'card_cursor', value: String(newCursor) },
           { onConflict: 'key' }
         );
-        log(`Batch complete. ${remaining} cards remaining — click "Continue" to sync next batch.`);
+        log(isScheduledRun
+          ? `Batch complete. ${remaining} cards remaining — the next daily cron run will continue.`
+          : `Batch complete. ${remaining} cards remaining — click "Continue" to sync next batch.`);
+        if (isScheduledRun) {
+          try {
+            await supabase.from('sync_meta').upsert(
+              { key: 'last_cron_result', value: `completed — card batch done (${processed} cards), ${remaining} remaining` },
+              { onConflict: 'key' }
+            );
+          } catch {}
+        }
       }
 
-      res.end();
+      } // end cards-work block
+
+      // Ending the response here would let the platform terminate the function
+      // before the price batch below runs, so only end when this was the whole job.
+      if (phase === 'cards' || !isScheduledRun) return res.end();
     }
     // Prices phase — fetch pricing for all cards in batches, update price columns only
-    // Also runs automatically on every scheduled cron (one cursor-batch per run keeps prices rotating)
+    // Also runs on every scheduled cron with time to spare (one cursor-batch per run keeps prices rotating)
     if (phase === 'prices' || (isScheduledRun && phase === 'auto')) {
+      if (isScheduledRun && phase === 'auto' && timeLeft() < 10_000) {
+        log('Not enough time left for a price batch this run — skipping.');
+        return res.end();
+      }
       // Load cursor from sync_meta
       const { data: metaRows } = await supabase
         .from('sync_meta')
@@ -453,7 +639,12 @@ export default async function handler(req, res) {
       const slice = allIds.slice(cursor, cursor + CARD_BATCH_SIZE);
       log(`Syncing prices for cards ${cursor + 1}–${cursor + slice.length} of ${allIds.length}…`);
 
+      let processed = 0;
       for (let i = 0; i < slice.length; i += BATCH) {
+        if (outOfTime()) {
+          log(`Time budget reached after ${processed} price updates — saving progress.`);
+          break;
+        }
         const batch = slice.slice(i, i + BATCH);
         const cards = await fetchBatch(batch.map((id) => `${API}/cards/${id}`));
         const rows = cards.filter(Boolean).map((card) => {
@@ -481,10 +672,11 @@ export default async function handler(req, res) {
           const { error } = await supabase.from('cards').upsert(rows, { onConflict: 'id' });
           if (error) throw new Error(`Prices upsert: ${error.message}`);
         }
+        processed += batch.length;
         await sleep(80);
       }
 
-      const newCursor = cursor + slice.length;
+      const newCursor = cursor + processed;
       const remaining = allIds.length - newCursor;
 
       if (remaining <= 0) {
@@ -505,7 +697,11 @@ export default async function handler(req, res) {
       if (isScheduledRun) {
         try {
           await supabase.from('sync_meta').upsert(
-            { key: 'last_cron_result', value: remaining <= 0 ? 'completed — full price cycle done' : `completed — price batch done, ${remaining} remaining` },
+            {
+              key: 'last_cron_result',
+              value: (remaining <= 0 ? 'completed — full price cycle done' : `completed — price batch done, ${remaining} remaining`)
+                + (cronSkippedSets ? ' (sets/cards skipped — not sync day)' : ''),
+            },
             { onConflict: 'key' }
           );
         } catch {}
