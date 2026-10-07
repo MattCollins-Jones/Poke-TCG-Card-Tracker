@@ -90,8 +90,8 @@ function ScheduleConfig({ initial, onSave }) {
 
   const nextRunLabel = () => {
     if (scheduleType === 'manual_only') return 'No automatic sync';
-    if (scheduleType === 'weekly')  return `Every ${DAY_NAMES[scheduleDay]} at 3:00 AM UTC`;
-    if (scheduleType === 'monthly') return `Every month on day ${scheduleDay} at 3:00 AM UTC`;
+    if (scheduleType === 'weekly')  return `Starts every ${DAY_NAMES[scheduleDay]} at 3:00 AM UTC — remaining cards and prices continue daily`;
+    if (scheduleType === 'monthly') return `Starts every month on day ${scheduleDay} at 3:00 AM UTC — remaining cards and prices continue daily`;
     return '';
   };
 
@@ -171,6 +171,7 @@ export default function SyncPage() {
   const [done, setDone] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [hasPriceMore, setHasPriceMore] = useState(false);
+  const [hasImageMore, setHasImageMore] = useState(false);
   const [status, setStatus] = useState(null);
   const { refreshSets } = useDigitalFilter();
 
@@ -186,6 +187,7 @@ export default function SyncPage() {
     setHasMore(false);
     if (phase === 'auto') setLog(['Starting sync…']);
     else if (phase === 'prices') setLog((prev) => [...prev, '--- Starting price sync ---']);
+    else if (phase === 'images') setLog((prev) => [...prev, '--- Verifying set images ---']);
     else setLog((prev) => [...prev, `--- Continuing (${phase}) ---`]);
 
     try {
@@ -199,11 +201,13 @@ export default function SyncPage() {
         setHasPriceMore(hasRemaining);
         // Refresh status to pick up updated last_price_sync
         if (!hasRemaining) apiFetch('/api/sync').then(async (r) => { if (r.ok) setStatus(await r.json()); });
+      } else if (phase === 'images') {
+        setHasImageMore(hasRemaining);
       } else {
         setHasMore(hasRemaining);
         if (!hasRemaining) apiFetch('/api/sync').then(async (r) => { if (r.ok) setStatus(await r.json()); });
       }
-      setDone(!hasRemaining && phase !== 'prices');
+      setDone(!hasRemaining && phase !== 'prices' && phase !== 'images');
       // Sets/cards may have changed — refresh the shared catalog cache
       if (phase !== 'prices') refreshSets();
     } catch (err) {
@@ -268,6 +272,22 @@ export default function SyncPage() {
         )}
       </div>
 
+      <hr style={{ border: 'none', borderTop: '1px solid var(--surface2)', margin: '20px 0' }} />
+
+      <h2 style={{ fontSize: '1rem', marginBottom: 8 }}>🖼️ Set Images</h2>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: 14 }}>
+        Checks every set logo and symbol against the TCGdex image CDN and repairs URLs that have
+        moved or changed format. Custom-uploaded images are never touched. Sets TCGdex has no
+        artwork for show a bundled or default image and are re-checked against the API on every
+        sets sync, so they pick up images automatically if they appear later. Override any set's
+        image from the Admin page.
+      </p>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <button className="btn btn-secondary" onClick={() => runPhase('images')} disabled={running}>
+          {running ? '⏳ Checking…' : hasImageMore ? '▶ Continue Verifying' : '🖼️ Verify Set Images'}
+        </button>
+      </div>
+
       {log.length > 0 && (
         <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 20, marginTop: 20 }}>
           {done && (
@@ -283,6 +303,11 @@ export default function SyncPage() {
           {hasPriceMore && !running && (
             <div style={{ marginBottom: 12, fontWeight: 600, color: 'var(--yellow)' }}>
               ⏳ More prices to sync — click <strong>Continue Price Batch</strong>
+            </div>
+          )}
+          {hasImageMore && !running && (
+            <div style={{ marginBottom: 12, fontWeight: 600, color: 'var(--yellow)' }}>
+              ⏳ More sets to check — click <strong>Continue Verifying</strong>
             </div>
           )}
           <div style={{

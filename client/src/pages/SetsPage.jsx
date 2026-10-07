@@ -6,6 +6,7 @@ import { apiFetch } from "../lib/apiFetch.js";
 import { useCurrency } from "../context/CurrencyContext.jsx";
 import { useDigitalFilter } from "../context/DigitalFilterContext.jsx";
 import DigitalToggle from "../components/DigitalToggle.jsx";
+import SetImage from "../components/SetImage.jsx";
 
 function getRarityColor(rarity) {
   if (!rarity) return null;
@@ -254,15 +255,7 @@ export default function SetsPage() {
               <div className="sets-grid">
                 {seriesSets.map((set) => (
                   <div key={set.id} className="set-card" onClick={() => navigate(`/sets/${set.id}`)}>
-                    {set.images?.logo ? (
-                      <img src={set.images.logo} alt={set.name} />
-                    ) : set.images?.symbol ? (
-                      <div className="set-symbol-fallback">
-                        <img src={set.images.symbol} alt={set.name} className="set-symbol-img" />
-                      </div>
-                    ) : (
-                      <div className="set-logo-placeholder"><span>{set.name}</span></div>
-                    )}
+                    <SetImage set={set} alt={set.name} className="set-card-img" />
                     <div className="set-name">{set.name}</div>
                     <div className="set-meta">
                       {collectionSummary[set.id]
@@ -296,15 +289,7 @@ export default function SetsPage() {
               <div className="sets-grid sets-grid-compact">
                 {filtered.map((set) => (
                   <div key={set.id} className="set-card" onClick={() => navigate(`/sets/${set.id}`)}>
-                    {set.images?.logo ? (
-                      <img src={set.images.logo} alt={set.name} />
-                    ) : set.images?.symbol ? (
-                      <div className="set-symbol-fallback">
-                        <img src={set.images.symbol} alt={set.name} className="set-symbol-img" />
-                      </div>
-                    ) : (
-                      <div className="set-logo-placeholder"><span>{set.name}</span></div>
-                    )}
+                    <SetImage set={set} alt={set.name} className="set-card-img" />
                     <div className="set-name">{set.name}</div>
                     <div className="set-meta">
                       {collectionSummary[set.id]
@@ -336,7 +321,7 @@ export default function SetsPage() {
               {cardGroupEntries.map(({ setInfo, cards: setCards }) => (
                 <div key={setInfo.id} style={{ marginBottom: 40 }}>
                   <div className="search-set-header">
-                    {setInfo.images?.symbol && <img src={setInfo.images.symbol} alt="" className="search-set-symbol" />}
+                    <SetImage set={setInfo} preferSymbol noDefault className="search-set-symbol" />
                     <h2 style={{ fontSize: "1.1rem", margin: 0 }}>{setInfo.name}</h2>
                     {setInfo.series && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{setInfo.series}</span>}
                     <button className="filter-btn" style={{ marginLeft: "auto", fontSize: "0.8rem", padding: "2px 10px" }} onClick={() => navigate(`/sets/${setInfo.id}`)}>
