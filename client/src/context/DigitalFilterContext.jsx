@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../lib/apiFetch.js';
 
 export const DIGITAL_SERIES = ['Pokémon TCG Pocket'];
@@ -21,22 +21,47 @@ export function DigitalFilterProvider({ children }) {
   const [sets, setSets] = useState([]);
   const [setsLoading, setSetsLoading] = useState(true);
   const [setsError, setSetsError] = useState('');
+  // {id, series} for every set including admin-hidden ones, so saved
+  // collection/wishlist entries from hidden Pocket sets are still classified.
+  const [seriesById, setSeriesById] = useState({});
+  const hasSets = useRef(false);
 
-  useEffect(() => {
-    apiFetch('/api/sets')
+  /** Re-fetch the catalog (call after sync / admin edits or when returning to Browse Sets). */
+  const refreshSets = useCallback(() => {
+    setSetsError('');
+    if (!hasSets.current) setSetsLoading(true);
+
+    const visible = apiFetch('/api/sets')
       .then((r) => r.json())
       .then((d) => {
-        if (d.error) setSetsError(d.error);
-        else setSets(d.data ?? []);
-        setSetsLoading(false);
+        if (d.error) { setSetsError(d.error); }
+        else { setSets(d.data ?? []); hasSets.current = true; }
       })
-      .catch((e) => { setSetsError(e.message); setSetsLoading(false); });
+      .catch((e) => setSetsError(e.message))
+      .finally(() => setSetsLoading(false));
+
+    const classification = apiFetch('/api/sets?mode=series')
+      .then((r) => r.json())
+      .then((d) => {
+        if (!Array.isArray(d.data)) return;
+        const map = {};
+        d.data.forEach((s) => { map[s.id] = s.series ?? null; });
+        setSeriesById(map);
+      })
+      .catch(() => {});
+
+    return Promise.all([visible, classification]);
   }, []);
 
-  const digitalSetIds = useMemo(
-    () => new Set(sets.filter((s) => isDigitalSeries(s.series)).map((s) => s.id)),
-    [sets]
-  );
+  useEffect(() => { refreshSets(); }, [refreshSets]);
+
+  const digitalSetIds = useMemo(() => {
+    const ids = new Set();
+    Object.entries(seriesById).forEach(([id, series]) => { if (isDigitalSeries(series)) ids.add(id); });
+    // Fall back to the visible catalog in case the classification fetch failed
+    sets.forEach((s) => { if (isDigitalSeries(s.series)) ids.add(s.id); });
+    return ids;
+  }, [seriesById, sets]);
 
   const setHideDigital = (value) => {
     localStorage.setItem(LS_KEY, value ? 'true' : 'false');
@@ -58,6 +83,7 @@ export function DigitalFilterProvider({ children }) {
     sets,
     setsLoading,
     setsError,
+    refreshSets,
     digitalSetIds,
     isDigitalSet,
     isDigitalSeries,

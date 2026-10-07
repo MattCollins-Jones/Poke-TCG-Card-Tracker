@@ -22,7 +22,7 @@ function getRarityColor(rarity) {
 export default function SetsPage() {
   const navigate = useNavigate();
   const { fmt, convertEur, convertUsd } = useCurrency();
-  const { sets: allSets, setsLoading: loading, setsError: error, hideDigital, isDigitalSeries } = useDigitalFilter();
+  const { sets: allSets, setsLoading: loading, setsError: error, refreshSets, hideDigital, isDigitalSeries, isDigitalSet } = useDigitalFilter();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -42,6 +42,9 @@ export default function SetsPage() {
   const loadingSetIds = useRef(new Set());
 
   useEffect(() => {
+    // Revalidate the catalog on each visit so sync / admin changes show up
+    refreshSets();
+
     apiFetch("/api/collection?mode=summary")
       .then((r) => r.json())
       .then((summary) => {
@@ -186,7 +189,9 @@ export default function SetsPage() {
   };
 
   const sets = hideDigital ? allSets.filter((s) => !isDigitalSeries(s.series)) : allSets;
-  const visibleCardResults = hideDigital ? cardResults.filter((c) => !isDigitalSeries(c.set?.series)) : cardResults;
+  // Search results from the local Express API omit set.series, so also check by set ID
+  const isDigitalCard = (c) => isDigitalSeries(c.set?.series) || isDigitalSet(c.set?.id);
+  const visibleCardResults = hideDigital ? cardResults.filter((c) => !isDigitalCard(c)) : cardResults;
 
   const filtered = sets.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
