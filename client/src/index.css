@@ -1635,7 +1635,8 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
 }
 .share-list-item:hover { border-color: var(--yellow); box-shadow: var(--shadow); }
 .share-list-item.off { opacity: 0.7; }
-.share-list-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--bg); border-radius: 8px; }
+.share-list-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--bg); border-radius: 8px; overflow: hidden; padding: 4px; box-sizing: border-box; }
+.share-list-icon-img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
 .share-list-emoji { font-size: 1.3rem; }
 .share-list-main { flex: 1; min-width: 0; }
 .share-list-title { font-weight: 600; margin-bottom: 4px; }

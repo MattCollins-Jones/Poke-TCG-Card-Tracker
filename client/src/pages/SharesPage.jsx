@@ -71,7 +71,7 @@ export default function SharesPage() {
               <div className="share-list-icon">
                 {row.type === 'wishlist'
                   ? <span className="share-list-emoji">⭐</span>
-                  : <SetImage set={row.set ?? { id: row.set_id }} preferSymbol noDefault style={{ height: 28 }} />}
+                  : <SetImage set={row.set ?? { id: row.set_id }} preferSymbol noDefault className="share-list-icon-img" />}
               </div>
               <div className="share-list-main">
                 <div className="share-list-title">{row.displayTitle}</div>
