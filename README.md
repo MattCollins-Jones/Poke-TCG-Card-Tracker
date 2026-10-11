@@ -158,11 +158,25 @@ create table sync_meta (
   value text
 );
 
+-- Public share links (wishlist or missing-cards-per-set pages)
+create table shares (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users(id) on delete cascade,
+  slug       text unique not null,
+  type       text not null check (type in ('wishlist', 'set_missing')),
+  set_id     text references sets(id),
+  title      text,
+  enabled    boolean default true,
+  created_at timestamptz default now()
+);
+create index shares_user_idx on shares(user_id);
+
 -- Row-level security (enable on all tables)
 alter table sets        enable row level security;
 alter table cards       enable row level security;
 alter table collection  enable row level security;
 alter table sync_meta   enable row level security;
+alter table shares      enable row level security;
 
 -- Public read access for sets and cards
 create policy "Public read sets"  on sets  for select using (true);
@@ -170,6 +184,10 @@ create policy "Public read cards" on cards for select using (true);
 
 -- Users can only access their own collection
 create policy "Own collection" on collection
+  for all using (auth.uid() = user_id);
+
+-- Users can only manage their own share links (public reads go via the API with the service key)
+create policy "Own shares" on shares
   for all using (auth.uid() = user_id);
 
 -- sync_meta: service role only (no anon access needed)
@@ -191,7 +209,8 @@ pokemon-tracker/
 │   ├── auth/
 │   │   └── me.js               # Returns current user + admin flag
 │   ├── collection/
-│   │   └── index.js            # GET/POST/PATCH/DELETE collection entries
+│   │   ├── index.js            # GET/POST collection entries
+│   │   └── [id].js             # PUT/DELETE an entry; also /share (public) and /shares (owner) routes
 │   ├── sets/
 │   │   └── index.js            # Public sets list
 │   ├── cards/
@@ -202,7 +221,8 @@ pokemon-tracker/
 │   │   └── index.js            # TCGdex sync (sets / cards / prices phases)
 │   └── lib/
 │       ├── supabase.js         # Supabase client factory
-│       └── apiFetch.js         # Authenticated fetch helper
+│       ├── shares.js           # Share-link CRUD + public payload builders
+│       └── finishes.js         # Server-side finish/variant helpers
 ├── client/                     # React + Vite frontend
 │   └── src/
 │       ├── pages/
@@ -210,11 +230,14 @@ pokemon-tracker/
 │       │   ├── CardsPage.jsx
 │       │   ├── CollectionPage.jsx
 │       │   ├── WishlistPage.jsx
+│       │   ├── SharePage.jsx   # Public /share/:slug page (no login)
 │       │   ├── SyncPage.jsx
 │       │   ├── AdminPage.jsx
 │       │   └── LoginPage.jsx
 │       ├── components/
 │       │   ├── CardModal.jsx   # Card detail modal with pricing + lightbox
+│       │   ├── ShareButton.jsx # Owner dialog: create / copy / toggle / delete share links
+│       │   ├── ShareCardModal.jsx # Read-only card detail used on share pages
 │       │   ├── NavBar.jsx      # Navigation + currency selector
 │       │   └── ImageUpload.jsx # URL input + file upload to Supabase Storage
 │       ├── context/
@@ -232,6 +255,7 @@ pokemon-tracker/
 
 - **Admin access** is gated by matching the logged-in user's email to the `ADMIN_EMAIL` environment variable (server-side check)
 - **Image uploads** go directly from the browser to Supabase Storage via a server-generated signed URL — no file data passes through the serverless function
-- **Vercel Hobby plan** supports up to 12 serverless functions; this project uses exactly 12
+- **Vercel Hobby plan** supports up to 12 serverless functions; this project uses exactly 12. Share links are multiplexed into `api/collection/[id].js` (`/api/collection/share` + `/api/collection/shares`) rather than adding a 13th function
+- **Share links** (`/share/<slug>`) are public and need no login. They show live data for either the owner's wishlist or the cards still missing from one set, with the finishes (Normal / Holo / Reverse Holo / 1st Ed.) still needed. The slug is a random 96-bit token; owners can turn a link off or delete it from the 🔗 Share dialog. The public payload never includes emails, user IDs, notes or conditions. Responses are edge-cached for 60 s (`s-maxage`), so revokes and collection changes can take up to a minute to show. Pages carry a `noindex` meta tag; because the app is a SPA, link previews (Open Graph) are generic
 - **Sync timeout**: Vercel Hobby functions have a 60-second max duration (configured in `vercel.json`). The sync is split into phases and batches to stay within this limit
 - **Currency rates** are fetched client-side on page load from `open.er-api.com` — no API key needed, no server call used

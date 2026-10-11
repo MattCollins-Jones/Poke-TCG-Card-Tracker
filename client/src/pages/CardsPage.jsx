@@ -4,6 +4,7 @@ import CardModal from '../components/CardModal.jsx';
 import { getAvailableFinishes, FINISH_LABELS, FINISH_LABELS_SHORT } from '../utils/finishes.js';
 import { apiFetch } from '../lib/apiFetch.js';
 import SetImage from '../components/SetImage.jsx';
+import ShareButton from '../components/ShareButton.jsx';
 
 const OWNERSHIP_FILTERS = ['all', 'owned', 'not owned', 'wishlist'];
 
@@ -318,6 +319,7 @@ export default function CardsPage() {
         >
           {unstacked ? '⊞ Stacked' : '⊟ Unstacked'}
         </button>
+        <ShareButton type="set_missing" setId={setId} defaultTitle={setInfo?.name ?? setId} />
         <div className="col-picker" title="Columns per row">
           <span className="col-picker-label">⊞</span>
           {[1,2,3,4,5,6,7].map((n) => (

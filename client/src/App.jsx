@@ -12,6 +12,7 @@ import WishlistPage from './pages/WishlistPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import SharePage from './pages/SharePage.jsx';
 
 export default function App() {
   return (
@@ -20,6 +21,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* Public, unauthenticated share pages */}
+          <Route path="/share/:slug" element={<SharePage />} />
           <Route path="/*" element={
             <AuthGuard>
               <DigitalFilterProvider>

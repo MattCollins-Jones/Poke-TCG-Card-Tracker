@@ -4,6 +4,7 @@ import { apiFetch } from '../lib/apiFetch.js';
 import { FINISH_LABELS_SHORT, FINISH_TO_VARIANT_KEY } from '../utils/finishes.js';
 import { useDigitalFilter } from '../context/DigitalFilterContext.jsx';
 import DigitalToggle from '../components/DigitalToggle.jsx';
+import ShareButton from '../components/ShareButton.jsx';
 
 function variantsFromEntries(entries) {
   const v = {};
@@ -133,6 +134,7 @@ export default function WishlistPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
             <DigitalToggle />
+            <ShareButton type="wishlist" />
           </div>
 
           {Object.entries(grouped).map(([setId, group]) => (
