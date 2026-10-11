@@ -231,6 +231,7 @@ pokemon-tracker/
 │       │   ├── CollectionPage.jsx
 │       │   ├── WishlistPage.jsx
 │       │   ├── SharePage.jsx   # Public /share/:slug page (no login)
+│       │   ├── SharesPage.jsx  # Owner's "Share Links" page — manage every link in one place
 │       │   ├── SyncPage.jsx
 │       │   ├── AdminPage.jsx
 │       │   └── LoginPage.jsx

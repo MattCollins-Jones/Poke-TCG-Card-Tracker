@@ -13,6 +13,7 @@ import SyncPage from './pages/SyncPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SharePage from './pages/SharePage.jsx';
+import SharesPage from './pages/SharesPage.jsx';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
                     <Route path="/search" element={<Navigate to="/" replace />} />
                     <Route path="/collection" element={<CollectionPage />} />
                     <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/shares" element={<SharesPage />} />
                     <Route path="/sync" element={<SyncPage />} />
                     <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
                   </Routes>

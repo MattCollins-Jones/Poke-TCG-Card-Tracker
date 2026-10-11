@@ -146,9 +146,7 @@ export default function SharePage() {
       </div>
 
       <div className="share-legend">
-        <span className="share-legend-item"><FinishChip finish="normal" state="needed" /> Needed</span>
-        <span className="share-legend-item"><FinishChip finish="normal" state="wishlisted" /> Needed &amp; on wishlist</span>
-        <span className="share-legend-item"><FinishChip finish="normal" state="owned" /> Already has</span>
+        <span className="share-legend-item">Versions still needed are shown under each card:</span>
         <span className="share-legend-item share-legend-key">N Normal · H Holo · R Reverse Holo · 1E 1st Edition</span>
       </div>
 
@@ -189,26 +187,22 @@ export default function SharePage() {
             <span className="progress-label">{set.cards.length} {set.cards.length === 1 ? 'card' : 'cards'}</span>
           </div>
           <div className="cards-grid share-grid">
-            {set.cards.map((card) => {
-              const wish = new Set(card.wishlisted ?? []);
-              return (
-                <div key={card.id} className="card-item share-card" onClick={() => setSelected({ card, set })}>
-                  {card.images?.small ? (
-                    <img src={card.images.small} alt={card.name} loading="lazy" />
-                  ) : (
-                    <div className="share-card-noimg">{card.name}</div>
-                  )}
-                  <div className="share-card-finishes">
-                    {card.needed.map((f) => <FinishChip key={f} finish={f} state={wish.has(f) ? 'wishlisted' : 'needed'} />)}
-                    {card.owned?.map((f) => <FinishChip key={`o-${f}`} finish={f} state="owned" />)}
-                  </div>
-                  <div className="card-item-info">
-                    <div className="card-item-name">{card.name}</div>
-                    <div className="card-item-number">#{card.number}{card.rarity ? ` · ${card.rarity}` : ''}</div>
-                  </div>
+            {set.cards.map((card) => (
+              <div key={card.id} className="card-item share-card" onClick={() => setSelected({ card, set })}>
+                {card.images?.small ? (
+                  <img src={card.images.small} alt={card.name} loading="lazy" />
+                ) : (
+                  <div className="share-card-noimg">{card.name}</div>
+                )}
+                <div className="share-card-finishes">
+                  {card.needed.map((f) => <FinishChip key={f} finish={f} />)}
                 </div>
-              );
-            })}
+                <div className="card-item-info">
+                  <div className="card-item-name">{card.name}</div>
+                  <div className="card-item-number">#{card.number}{card.rarity ? ` · ${card.rarity}` : ''}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       ))}

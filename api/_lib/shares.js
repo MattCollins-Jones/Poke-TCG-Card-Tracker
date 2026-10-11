@@ -162,10 +162,10 @@ async function buildWishlist(supabase, userId) {
     if (!group[r.card_id]) {
       const c = cardMap[r.card_id];
       group[r.card_id] = c
-        ? { ...shapeCard(c), needed: [], owned: [] }
+        ? { ...shapeCard(c), needed: [] }
         : {
             id: r.card_id, name: r.card_name, number: r.card_number, rarity: r.rarity,
-            images: { small: r.card_image, large: null }, needed: [], owned: [],
+            images: { small: r.card_image, large: null }, needed: [],
           };
     }
     if (!group[r.card_id].needed.includes(r.finish)) group[r.card_id].needed.push(r.finish);
@@ -193,11 +193,10 @@ async function buildSetMissing(supabase, userId, setId) {
   if (ownErr) throw new Error(ownErr.message);
 
   const ownedByCard = {};
-  const wishedByCard = {};
   for (const r of owned ?? []) {
-    const target = r.wishlist ? wishedByCard : ownedByCard;
-    if (!target[r.card_id]) target[r.card_id] = new Set();
-    target[r.card_id].add(r.finish);
+    if (r.wishlist) continue;
+    if (!ownedByCard[r.card_id]) ownedByCard[r.card_id] = new Set();
+    ownedByCard[r.card_id].add(r.finish);
   }
 
   let totalSlots = 0, ownedSlots = 0, fullyOwned = 0;
@@ -206,17 +205,12 @@ async function buildSetMissing(supabase, userId, setId) {
     const finishes = getAvailableFinishes(c.variants);
     const has = ownedByCard[c.id] ?? new Set();
     const needed = finishes.filter((f) => !has.has(f));
-    const ownedF = finishes.filter((f) => has.has(f));
+    const ownedCount = finishes.length - needed.length;
     totalSlots += finishes.length;
-    ownedSlots += ownedF.length;
-    if (ownedF.length > 0) fullyOwned += 1;
+    ownedSlots += ownedCount;
+    if (ownedCount > 0) fullyOwned += 1;
     if (needed.length === 0) continue;
-    missing.push({
-      ...shapeCard(c),
-      needed,
-      owned: ownedF,
-      wishlisted: needed.filter((f) => wishedByCard[c.id]?.has(f)),
-    });
+    missing.push({ ...shapeCard(c), needed });
   }
 
   const set = { ...shapeSet(setRow, setId), cards: missing };

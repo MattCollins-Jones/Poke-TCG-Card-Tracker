@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../lib/apiFetch.js';
+import { useShares, findShare, shareUrl, createShare, updateShare, deleteShare } from '../lib/shares.js';
 
 /**
  * "Share" button + dialog for a single share target (the wishlist, or the
- * missing cards of one set). Creates the link on demand, lets the owner copy it,
- * turn it off/on, rename it, or delete it.
+ * missing cards of one set). The button reflects the current state of the link
+ * (none / live / off); the dialog creates, copies, toggles, renames or deletes it.
  */
 export default function ShareButton({ type, setId = null, defaultTitle, className = 'filter-btn' }) {
   const [open, setOpen] = useState(false);
+  const { shares } = useShares();
+  const share = findShare(shares, type, setId);
+
+  const state = !share ? 'none' : share.enabled ? 'live' : 'off';
+  const label = state === 'live' ? '🔗 Shared' : state === 'off' ? '🔗 Link off' : '🔗 Share';
+  const hint = state === 'live' ? 'This page has a live public link — click to manage'
+    : state === 'off' ? 'This page has a public link that is turned off — click to manage'
+    : 'Create a public link to this page';
+
   return (
     <>
-      <button className={className} onClick={() => setOpen(true)} title="Create a public link to this page">
-        🔗 Share
+      <button className={`${className} share-btn share-btn-${state}`} onClick={() => setOpen(true)} title={hint}>
+        {label}
       </button>
       {open && (
         <ShareDialog type={type} setId={setId} defaultTitle={defaultTitle} onClose={() => setOpen(false)} />
@@ -20,9 +29,10 @@ export default function ShareButton({ type, setId = null, defaultTitle, classNam
   );
 }
 
-function ShareDialog({ type, setId, defaultTitle, onClose }) {
-  const [share, setShare] = useState(null);
-  const [loading, setLoading] = useState(true);
+export function ShareDialog({ type, setId, defaultTitle, onClose }) {
+  const { shares, loading, error: loadError } = useShares();
+  const share = findShare(shares, type, setId);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [title, setTitle] = useState('');
@@ -35,61 +45,20 @@ function ShareDialog({ type, setId, defaultTitle, onClose }) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  useEffect(() => {
-    apiFetch('/api/collection/shares')
-      .then((r) => r.json())
-      .then((rows) => {
-        if (!Array.isArray(rows)) throw new Error(rows?.error ?? 'Failed to load shares');
-        const found = rows.find((s) => s.type === type && (type === 'wishlist' || s.set_id === setId)) ?? null;
-        setShare(found);
-        setTitle(found?.title ?? '');
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [type, setId]);
+  // Keep the title field in step with the stored title when the share loads/changes
+  useEffect(() => { setTitle(share?.title ?? ''); }, [share?.id, share?.title]);
 
-  const url = share ? `${window.location.origin}/share/${share.slug}` : '';
+  const url = share ? shareUrl(share) : '';
 
   const call = async (fn) => {
     setBusy(true); setError(''); setCopied(false);
     try { await fn(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
 
-  const parse = async (r) => {
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.error ?? 'Request failed');
-    return body;
-  };
-
-  const create = () => call(async () => {
-    const body = await parse(await apiFetch('/api/collection/shares', {
-      method: 'POST',
-      body: JSON.stringify({ type, set_id: setId, title }),
-    }));
-    setShare(body);
-    setTitle(body.title ?? '');
-  });
-
-  const toggle = () => call(async () => {
-    setShare(await parse(await apiFetch('/api/collection/shares', {
-      method: 'PATCH',
-      body: JSON.stringify({ id: share.id, enabled: !share.enabled }),
-    })));
-  });
-
-  const saveTitle = () => call(async () => {
-    setShare(await parse(await apiFetch('/api/collection/shares', {
-      method: 'PATCH',
-      body: JSON.stringify({ id: share.id, title }),
-    })));
-  });
-
-  const remove = () => call(async () => {
-    await parse(await apiFetch(`/api/collection/shares?share_id=${encodeURIComponent(share.id)}`, { method: 'DELETE' }));
-    setShare(null);
-    setTitle('');
-    setConfirmDelete(false);
-  });
+  const create = () => call(() => createShare({ type, set_id: setId, title }));
+  const toggle = () => call(() => updateShare(share.id, { enabled: !share.enabled }));
+  const saveTitle = () => call(() => updateShare(share.id, { title }));
+  const remove = () => call(async () => { await deleteShare(share.id); setConfirmDelete(false); });
 
   const copy = async () => {
     try {
@@ -102,6 +71,7 @@ function ShareDialog({ type, setId, defaultTitle, onClose }) {
   };
 
   const titleDirty = share && (title.trim() || null) !== (share.title ?? null);
+  const shownError = error || loadError;
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -191,7 +161,7 @@ function ShareDialog({ type, setId, defaultTitle, onClose }) {
           </>
         )}
 
-        {error && <div className="share-dialog-error">{error}</div>}
+        {shownError && <div className="share-dialog-error">{shownError}</div>}
       </div>
     </div>
   );
