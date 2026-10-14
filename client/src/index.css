@@ -1470,3 +1470,197 @@ h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
   object-fit: contain;
   flex-shrink: 0;
 }
+
+/* ── Public share pages ── */
+.share-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+}
+.share-header { margin-bottom: 20px; }
+.share-brand { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.share-brand span { color: var(--yellow); }
+.share-title { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.share-subtitle { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; line-height: 1.5; }
+
+.share-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: -6px 0 18px;
+}
+.share-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.share-legend-key { margin-left: auto; }
+
+.share-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.share-card { border-color: transparent; }
+.share-card:hover { border-color: var(--yellow); }
+.share-card-noimg {
+  aspect-ratio: 63/88;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 8px;
+}
+.share-card-finishes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 8px 0;
+}
+.share-set-header { gap: 10px; }
+.share-set-header h2 { margin: 0; }
+.share-series { font-size: 0.75rem; color: var(--text-muted); background: var(--surface2); padding: 2px 8px; border-radius: 999px; }
+.share-set-header .progress-label { margin-left: auto; }
+
+.share-finish { font-size: 0.7rem; padding: 2px 6px; min-width: 22px; }
+
+.share-footer { text-align: center; color: var(--text-muted); font-size: 0.8rem; margin-top: 40px; }
+.share-footer a { color: var(--yellow); }
+
+/* Read-only card modal */
+.share-modal { max-width: 640px; }
+.share-modal-body { display: flex; gap: 20px; align-items: flex-start; }
+.share-modal-img {
+  width: 240px;
+  max-width: 45%;
+  flex-shrink: 0;
+  border-radius: 10px;
+  cursor: zoom-in;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+.share-modal-noimg {
+  aspect-ratio: 63/88;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: default;
+}
+.share-modal-info { flex: 1; min-width: 0; }
+.share-modal-info h2 { margin-bottom: 4px; font-size: 1.15rem; }
+.share-modal-info .meta { color: var(--text-muted); font-size: 0.85rem; }
+.share-modal-section { margin: 16px 0; }
+.share-finish-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.share-finish-list li { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+
+/* Owner share dialog */
+.share-dialog { max-width: 520px; }
+.share-dialog-title { margin-bottom: 8px; font-size: 1.1rem; }
+.share-dialog-desc { color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 18px; }
+.share-dialog-note { color: var(--text-muted); font-size: 0.78rem; margin-bottom: 14px; }
+.share-dialog-error { margin-top: 12px; color: #ef9a9a; font-size: 0.85rem; }
+.share-dialog-actions { flex-wrap: wrap; }
+.share-dialog-confirm { font-size: 0.82rem; color: #ef9a9a; flex: 1; }
+.share-url-row { display: flex; gap: 8px; align-items: center; }
+.share-url-row .form-control { flex: 1; min-width: 0; }
+.share-url { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.8rem; }
+.share-url-row .btn { white-space: nowrap; text-decoration: none; }
+
+.share-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--surface2);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+.share-status-dot { width: 10px; height: 10px; border-radius: 50%; background: #9e9e9e; flex-shrink: 0; }
+.share-status.on .share-status-dot { background: #4caf50; box-shadow: 0 0 8px #4caf50; }
+.share-status.off { color: var(--text-muted); }
+.share-switch { margin-left: auto; position: relative; display: inline-block; width: 42px; height: 24px; cursor: pointer; }
+.share-switch input { opacity: 0; width: 0; height: 0; }
+.share-switch span {
+  position: absolute; inset: 0;
+  background: var(--surface2);
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+.share-switch span::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.share-switch input:checked + span { background: #4caf50; }
+.share-switch input:checked + span::before { transform: translateX(18px); }
+.share-switch input:disabled + span { opacity: 0.6; }
+
+/* Share button state (on Wishlist / Cards pages) */
+.share-btn-live { border-color: #4caf50 !important; color: #4caf50 !important; }
+.share-btn-live:hover { background: rgba(76, 175, 80, 0.12) !important; }
+.share-btn-off { border-color: #9e9e9e !important; color: var(--text-muted) !important; border-style: dashed !important; }
+
+/* Shared badge on the Sets grid */
+.set-card { position: relative; }
+.set-shared-badge {
+  position: absolute;
+  top: 8px; right: 8px;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(76, 175, 80, 0.18);
+  border: 1px solid #4caf50;
+}
+.set-shared-badge.off { background: var(--surface2); border-color: #9e9e9e; opacity: 0.6; filter: grayscale(1); }
+
+/* Share Links management page */
+.share-page-intro { color: var(--text-muted); font-size: 0.9rem; max-width: 720px; line-height: 1.5; margin: -8px 0 20px; }
+.share-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.share-list-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.share-list-item:hover { border-color: var(--yellow); box-shadow: var(--shadow); }
+.share-list-item.off { opacity: 0.7; }
+.share-list-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--bg); border-radius: 8px; overflow: hidden; padding: 4px; box-sizing: border-box; }
+.share-list-icon-img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.share-list-emoji { font-size: 1.3rem; }
+.share-list-main { flex: 1; min-width: 0; }
+.share-list-title { font-weight: 600; margin-bottom: 4px; }
+.share-list-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; }
+.share-list-badge { padding: 1px 8px; border-radius: 999px; background: var(--surface2); color: var(--text); }
+.share-list-badge.wishlist { background: rgba(255, 203, 5, 0.18); color: var(--yellow); }
+.share-list-url { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-list-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.share-list-actions .btn { text-decoration: none; }
+.share-status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 3px 10px; border-radius: 999px; background: var(--bg); }
+.share-status-pill.on { color: #4caf50; }
+.share-status-pill.on .share-status-dot { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
+.share-status-pill.off { color: var(--text-muted); }
+
+@media (max-width: 640px) {
+  .share-list-item { flex-wrap: wrap; }
+  .share-list-actions { width: 100%; justify-content: flex-end; }
+}
+
+@media (max-width: 640px) {
+  .share-page { padding: 16px 12px 40px; }
+  .share-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .share-legend-key { margin-left: 0; width: 100%; }
+  .share-modal-body { flex-direction: column; align-items: center; }
+  .share-modal-img { width: 100%; max-width: 260px; }
+  .share-modal-info { width: 100%; }
+}

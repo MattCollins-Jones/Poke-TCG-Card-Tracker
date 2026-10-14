@@ -7,6 +7,19 @@ import { useCurrency } from "../context/CurrencyContext.jsx";
 import { useDigitalFilter } from "../context/DigitalFilterContext.jsx";
 import DigitalToggle from "../components/DigitalToggle.jsx";
 import SetImage from "../components/SetImage.jsx";
+import { useShares } from "../lib/shares.js";
+
+function SharedBadge({ share }) {
+  if (!share) return null;
+  return (
+    <span
+      className={`set-shared-badge${share.enabled ? "" : " off"}`}
+      title={share.enabled ? "Missing cards from this set are publicly shared" : "This set has a share link that is turned off"}
+    >
+      🔗
+    </span>
+  );
+}
 
 function getRarityColor(rarity) {
   if (!rarity) return null;
@@ -39,6 +52,9 @@ export default function SetsPage() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [quickAdding, setQuickAdding] = useState(new Set());
   const [ownedMapLoaded, setOwnedMapLoaded] = useState(false);
+  const { shares } = useShares();
+  const sharedSets = {};
+  shares.forEach((s) => { if (s.type === "set_missing") sharedSets[s.set_id] = s; });
 
   const loadingSetIds = useRef(new Set());
 
@@ -256,6 +272,7 @@ export default function SetsPage() {
                 {seriesSets.map((set) => (
                   <div key={set.id} className="set-card" onClick={() => navigate(`/sets/${set.id}`)}>
                     <SetImage set={set} alt={set.name} className="set-card-img" />
+                    <SharedBadge share={sharedSets[set.id]} />
                     <div className="set-name">{set.name}</div>
                     <div className="set-meta">
                       {collectionSummary[set.id]
@@ -290,6 +307,7 @@ export default function SetsPage() {
                 {filtered.map((set) => (
                   <div key={set.id} className="set-card" onClick={() => navigate(`/sets/${set.id}`)}>
                     <SetImage set={set} alt={set.name} className="set-card-img" />
+                    <SharedBadge share={sharedSets[set.id]} />
                     <div className="set-name">{set.name}</div>
                     <div className="set-meta">
                       {collectionSummary[set.id]

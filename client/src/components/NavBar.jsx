@@ -24,6 +24,7 @@ export default function NavBar() {
       <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Browse Sets</NavLink>
       <NavLink to="/collection" className={({ isActive }) => isActive ? 'active' : ''}>My Collection</NavLink>
       <NavLink to="/wishlist" className={({ isActive }) => isActive ? 'active' : ''}>Wishlist</NavLink>
+      <NavLink to="/shares" className={({ isActive }) => isActive ? 'active' : ''}>Share Links</NavLink>
       {isAdmin && (
         <div className="admin-dropdown" ref={adminRef}>
           <button className="admin-dropdown-btn" onClick={() => setAdminOpen((o) => !o)}>
